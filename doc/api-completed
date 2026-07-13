@@ -1,0 +1,253 @@
+# Completed Display APIs
+
+เอกสารนี้สรุปเฉพาะ API ที่:
+
+- เขียนเสร็จแล้วใน backend ตอนนี้
+- ใช้สำหรับ "อ่าน/แสดงข้อมูล" เป็นหลัก
+- มีทั้ง `controller` และ `service` รองรับจริง
+
+หมายเหตุ:
+- การจับคู่กับหน้าจอ mobile app อิงจากเอกสาร [react-native-architecture.md](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/doc/react-native-architecture.md) และ requirement ใน [api.md](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/doc/api.md)
+- ใน repo ปัจจุบันยังไม่พบ source code ของ mobile app จริง ดังนั้นส่วน "หน้าจอที่ใช้" เป็นการ map ตามโครงที่ออกแบบไว้ ไม่ใช่จากการเรียกใช้งานจริงในฝั่ง app
+
+## 1. `GET /api/auth/me`
+
+- สถานะ: เขียนเสร็จแล้ว
+- Auth: ต้องส่ง Bearer token
+- Controller: [AuthController.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/auth/controller/AuthController.java)
+- Service: [AuthService.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/auth/service/AuthService.java)
+
+หน้าที่:
+- ดึงข้อมูล user ของคนที่ login อยู่ตอนนี้
+
+Response หลัก:
+```json
+{
+  "id": "user-id",
+  "email": "user@example.com",
+  "displayName": "User Name",
+  "role": "MANAGER",
+  "restaurantId": "restaurant-id"
+}
+```
+
+เหมาะกับหน้าจอ mobile app:
+- `Splash / Auth bootstrap` ใช้เช็ก token ตอนเปิดแอป
+- `Profile screen`
+- `Dashboard screen` เพื่อรู้ role และ restaurant ที่ user สังกัด
+
+## 2. `GET /api/users/me`
+
+- สถานะ: เขียนเสร็จแล้ว
+- Auth: ต้องส่ง Bearer token
+- Controller: [UserController.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/auth/controller/UserController.java)
+- Service: [UserService.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/auth/service/UserService.java)
+
+หน้าที่:
+- ดึงข้อมูล user ปัจจุบันเหมือน `/api/auth/me`
+- ต่างกันที่ route นี้อยู่ภายใต้หมวด `users`
+
+Response หลัก:
+```json
+{
+  "id": "user-id",
+  "email": "user@example.com",
+  "displayName": "User Name",
+  "role": "EMPLOYEE",
+  "restaurantId": "restaurant-id"
+}
+```
+
+เหมาะกับหน้าจอ mobile app:
+- `Profile screen`
+- `Settings screen`
+- `Dashboard screen`
+
+หมายเหตุ:
+- ในเชิงใช้งานจริง mobile app มักเลือกใช้แค่เส้นเดียวระหว่าง `/api/auth/me` หรือ `/api/users/me` เพื่อลดความซ้ำซ้อน
+
+## 3. `GET /api/users/{id}`
+
+- สถานะ: เขียนเสร็จแล้ว
+- Auth: ต้องส่ง Bearer token
+- Controller: [UserController.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/auth/controller/UserController.java)
+- Service: [UserService.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/auth/service/UserService.java)
+
+หน้าที่:
+- ดูรายละเอียด user รายคนตาม `id`
+
+Response หลัก:
+```json
+{
+  "id": "target-user-id",
+  "email": "target@example.com",
+  "displayName": "Target User",
+  "role": "EMPLOYEE",
+  "restaurantId": "restaurant-id"
+}
+```
+
+เหมาะกับหน้าจอ mobile app:
+- `Member detail screen`
+- `Edit profile of member` ก่อนโหลดข้อมูลเดิมมาแสดง
+
+ข้อสังเกต:
+- เส้นนี้เปิดให้ user ที่ login แล้วเรียกได้ แต่ใน service ยังไม่มีการจำกัดสิทธิ์ว่าใครดู user คนอื่นได้แค่ไหน
+
+## 4. `GET /api/users?restaurantId=...`
+
+- สถานะ: เขียนเสร็จแล้ว
+- Auth: ต้องส่ง Bearer token
+- Controller: [UserController.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/auth/controller/UserController.java)
+- Service: [UserService.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/auth/service/UserService.java)
+
+หน้าที่:
+- ดึงรายชื่อ user ทั้งหมด
+- ถ้าส่ง `restaurantId` จะ filter เฉพาะสมาชิกของร้านนั้น
+
+Response หลัก:
+```json
+[
+  {
+    "id": "user-1",
+    "email": "a@example.com",
+    "displayName": "A",
+    "role": "MANAGER",
+    "restaurantId": "restaurant-id"
+  },
+  {
+    "id": "user-2",
+    "email": "b@example.com",
+    "displayName": "B",
+    "role": "EMPLOYEE",
+    "restaurantId": "restaurant-id"
+  }
+]
+```
+
+เหมาะกับหน้าจอ mobile app:
+- `Member list screen`
+- `Manager dashboard` ส่วนรายชื่อพนักงาน
+
+ข้อสังเกต:
+- ถ้าไม่ส่ง `restaurantId` จะคืน user ทั้งระบบ ซึ่งสำหรับ production ควรมีการจำกัดสิทธิ์เพิ่ม
+
+## 5. `GET /api/restaurants/{id}`
+
+- สถานะ: เขียนเสร็จแล้ว
+- Auth: ต้องส่ง Bearer token
+- Controller: [RestaurantController.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/restaurant/controller/RestaurantController.java)
+- Service: [RestaurantService.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/restaurant/service/RestaurantService.java)
+
+หน้าที่:
+- ดึงรายละเอียดร้านอาหารตาม `id`
+
+Response หลัก:
+```json
+{
+  "id": "restaurant-id",
+  "name": "My Restaurant",
+  "managerId": "manager-id",
+  "inviteCode": "ABC123",
+  "createdAt": "2026-07-11T10:00:00Z",
+  "updatedAt": "2026-07-11T10:00:00Z"
+}
+```
+
+เหมาะกับหน้าจอ mobile app:
+- `Restaurant profile screen`
+- `Manager dashboard`
+- `Settings screen` ของร้าน
+
+ข้อสังเกต:
+- ข้อมูล `inviteCode` ถูกส่งกลับมาด้วย จึงใช้ได้กับหน้าที่ต้องโชว์โค้ดเชิญ
+
+## 6. `GET /api/restaurants/invite/{inviteCode}`
+
+- สถานะ: เขียนเสร็จแล้ว
+- Auth: ต้องส่ง Bearer token
+- Controller: [RestaurantController.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/restaurant/controller/RestaurantController.java)
+- Service: [RestaurantService.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/restaurant/service/RestaurantService.java)
+
+หน้าที่:
+- ค้นหาร้านจาก invite code
+- ใช้ตอน employee กรอกรหัสเพื่อดูว่ากำลังจะเข้าร้านไหน
+
+Response หลัก:
+```json
+{
+  "id": "restaurant-id",
+  "name": "My Restaurant",
+  "managerId": "manager-id",
+  "inviteCode": "ABC123",
+  "createdAt": "2026-07-11T10:00:00Z",
+  "updatedAt": "2026-07-11T10:00:00Z"
+}
+```
+
+เหมาะกับหน้าจอ mobile app:
+- `Join restaurant screen`
+- `Register screen` กรณีสมัครเป็น employee แล้วต้องตรวจ invite code
+
+## 7. `GET /api/restaurants/{id}/members`
+
+- สถานะ: เขียนเสร็จแล้ว
+- Auth: ต้องส่ง Bearer token
+- Controller: [RestaurantController.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/restaurant/controller/RestaurantController.java)
+- Service: [RestaurantService.java](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/src/main/java/com/app/expiry_system/restaurant/service/RestaurantService.java)
+
+หน้าที่:
+- ดึงสมาชิกทั้งหมดของร้านตาม `restaurantId`
+
+Response หลัก:
+```json
+[
+  {
+    "id": "user-1",
+    "email": "manager@example.com",
+    "displayName": "Manager",
+    "role": "MANAGER",
+    "restaurantId": "restaurant-id"
+  },
+  {
+    "id": "user-2",
+    "email": "employee@example.com",
+    "displayName": "Employee",
+    "role": "EMPLOYEE",
+    "restaurantId": "restaurant-id"
+  }
+]
+```
+
+เหมาะกับหน้าจอ mobile app:
+- `Restaurant members screen`
+- `Manager dashboard` ส่วนจัดการสมาชิก
+
+## สรุปเร็ว
+
+API ที่เป็นเส้น "แสดงข้อมูล" และเขียนเสร็จแล้วตอนนี้ มี 7 เส้น:
+
+1. `GET /api/auth/me`
+2. `GET /api/users/me`
+3. `GET /api/users/{id}`
+4. `GET /api/users?restaurantId=...`
+5. `GET /api/restaurants/{id}`
+6. `GET /api/restaurants/invite/{inviteCode}`
+7. `GET /api/restaurants/{id}/members`
+
+ถ้ามองจาก mobile app:
+- กลุ่ม auth/profile ใช้ `GET /api/auth/me` หรือ `GET /api/users/me`
+- กลุ่มร้านอาหารใช้ `GET /api/restaurants/{id}` และ `GET /api/restaurants/invite/{inviteCode}`
+- กลุ่มสมาชิกใช้ `GET /api/users/{id}`, `GET /api/users?restaurantId=...`, `GET /api/restaurants/{id}/members`
+
+## ยังไม่พบว่าเขียนเสร็จ
+
+จาก requirement ใน [api.md](/Users/Mac/Project_SmartExpiryDateNotificationSystem/expiry-system/doc/api.md) ยังไม่พบ implementation จริงของหมวดเหล่านี้:
+
+- Ingredients
+- Usage History
+- Suggestions
+- Notifications
+- OCR / Scan Support
+
+ดังนั้นถ้าจะทำเอกสาร "เฉพาะเส้นที่เสร็จแล้ว" ตอนนี้ควรนับเฉพาะกลุ่ม `auth`, `users`, `restaurants` ตามรายการด้านบน
