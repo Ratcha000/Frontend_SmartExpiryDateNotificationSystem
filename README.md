@@ -1,5 +1,6 @@
 # Project Setup
 
+คู่มือนี้สำหรับการรันโปรเจกต์ Expo/React Native นี้บนเครื่อง local และทดสอบผ่าน Expo Go บน Android
 
 ## 1. สิ่งที่ต้องติดตั้ง
 
