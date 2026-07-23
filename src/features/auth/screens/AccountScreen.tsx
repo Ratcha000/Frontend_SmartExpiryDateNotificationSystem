@@ -1,258 +1,231 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
   ActivityIndicator,
   Alert,
   ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
 } from 'react-native';
-import { restaurantsApi } from '../../../api/restaurants';
+import { useFonts, Mali_400Regular, Mali_700Bold } from '@expo-google-fonts/mali';
 import { useAuth } from '../../../context/AuthContext';
-import { Restaurant } from '../../../types';
-import { colors, shadows } from '../../../theme/colors';
+
+// 🔴 นำเข้า Service ที่เราจัดระเบียบไว้ (ปรับ path ให้ตรงกับโฟลเดอร์ api ของคุณนะครับ)
+import { restaurantService } from '../../../api/restaurants';
+import { authApi } from '../../../api/auth';
+
+const theme = {
+  background: '#F5F3E9',
+  card: '#FFFFFF',
+  primary: '#4A3623',
+  inputBg: '#EBE7E0',
+  textLight: '#8D867E',
+  textDark: '#382512',
+  border: '#DCD6CE',
+  danger: '#D9534F',
+};
 
 export default function AccountScreen() {
-  const { user, logout } = useAuth();
-  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
-  const [isLoadingRestaurant, setIsLoadingRestaurant] = useState(false);
-
-  useEffect(() => {
-    const fetchRestaurant = async () => {
-      if (!user?.restaurantId) {
-        setRestaurant(null);
-        return;
-      }
-
-      try {
-        setIsLoadingRestaurant(true);
-        const response = await restaurantsApi.getDetails(user.restaurantId);
-        setRestaurant(response);
-      } catch (error) {
-        console.warn('Failed to load restaurant details:', error);
-        setRestaurant(null);
-      } finally {
-        setIsLoadingRestaurant(false);
-      }
-    };
-
-    fetchRestaurant();
-  }, [user?.restaurantId]);
+  const [fontsLoaded] = useFonts({ Mali_400Regular, Mali_700Bold });
+  const { user, logout, setUser } = useAuth();
+  
+  const [mode, setMode] = useState<'SELECT' | 'CREATE' | 'JOIN'>('SELECT');
+  const [restaurantName, setRestaurantName] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleLogout = () => {
     Alert.alert('ออกจากระบบ', 'คุณต้องการออกจากระบบใช่หรือไม่?', [
       { text: 'ยกเลิก', style: 'cancel' },
-      {
-        text: 'ออกจากระบบ',
-        style: 'destructive',
-        onPress: async () => {
-          await logout();
-        },
-      },
+      { text: 'ออกจากระบบ', style: 'destructive', onPress: async () => await logout() },
     ]);
   };
 
+  const handleCreateRestaurant = async () => {
+    if (!restaurantName) return;
+    setLoading(true);
+    try {
+      // 1. เรียกใช้ Service สร้างร้าน
+      await restaurantService.createRestaurant(restaurantName);
+      
+      // 2. เรียกใช้ Service ดึงข้อมูล User ล่าสุด
+      const currentUser = await authApi.getCurrentUser();
+      
+      // 3. อัปเดตลง Context ระบบจะพาเด้งเข้า Dashboard อัตโนมัติ
+      if (setUser) setUser(currentUser);
+      
+    } catch (err: any) {
+      console.log('>>> [DEBUG] Error สร้างร้าน:', err?.response?.data || err.message);
+      Alert.alert('ข้อผิดพลาด', err?.response?.data?.message || 'เกิดข้อผิดพลาดในการสร้างร้าน');
+      setLoading(false);
+    }
+  };
+
+  const handleJoinRestaurant = async () => {
+    if (!inviteCode) return;
+    setLoading(true);
+    try {
+      // 1. เรียกใช้ Service เข้าร่วมร้าน
+      await restaurantService.joinRestaurant(inviteCode);
+      
+      // 2. เรียกใช้ Service ดึงข้อมูล User ล่าสุด
+      const currentUser = await authApi.getCurrentUser();
+      
+      // 3. อัปเดตลง Context
+      if (setUser) setUser(currentUser);
+      
+    } catch (err: any) {
+      console.log('>>> [DEBUG] Error เข้าร่วมร้าน:', err?.response?.data || err.message);
+      Alert.alert('ข้อผิดพลาด', err?.response?.data?.message || 'รหัสเชิญไม่ถูกต้อง');
+      setLoading(false);
+    }
+  };
+
+  if (!fontsLoaded) return <View style={styles.loadingScreen}><ActivityIndicator color={theme.primary} /></View>;
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.hero}>
-        <Text style={styles.eyebrow}>Account overview</Text>
-        <Text style={styles.heroTitle}>Professional profile and restaurant access.</Text>
-        <Text style={styles.heroSubtitle}>
-          ข้อมูลด้านล่างดึงจาก session ปัจจุบันและ API อ่านข้อมูลที่ backend ทำเสร็จแล้ว
-        </Text>
+    <View style={styles.container}>
+      <View style={styles.topBar}>
+        <View style={styles.userInfo}>
+          <Text style={styles.userAvatar}>👤</Text>
+          <Text style={styles.userName} numberOfLines={1}>{user?.displayName || 'User'}</Text>
+        </View>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutButtonText}>Logout</Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.title}>Profile</Text>
-
-        <View style={styles.row}>
-          <Text style={styles.label}>Display name</Text>
-          <Text style={styles.value}>{user?.displayName ?? '-'}</Text>
-        </View>
-
-        <View style={styles.row}>
-          <Text style={styles.label}>Email</Text>
-          <Text style={styles.value}>{user?.email ?? '-'}</Text>
-        </View>
-
-        <View style={styles.row}>
-          <Text style={styles.label}>Role</Text>
-          <View style={styles.rolePill}>
-            <Text style={styles.roleText}>{user?.role ?? '-'}</Text>
-          </View>
-        </View>
-
-        <View style={[styles.row, styles.rowLast]}>
-          <Text style={styles.label}>Restaurant ID</Text>
-          <Text style={styles.value}>{user?.restaurantId ?? '-'}</Text>
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.title}>Restaurant</Text>
-        {isLoadingRestaurant ? (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator color={colors.accent} />
-            <Text style={styles.loadingText}>Loading restaurant details</Text>
-          </View>
-        ) : restaurant ? (
-          <>
-            <View style={styles.row}>
-              <Text style={styles.label}>Name</Text>
-              <Text style={styles.value}>{restaurant.name}</Text>
+      <KeyboardAvoidingView 
+        style={styles.keyboardView} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled" 
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.content}>
+            
+            <View style={styles.header}>
+              <Text style={styles.icon}>🍳</Text>
+              <Text style={styles.title}>Welcome to Smart Expiry</Text>
+              <Text style={styles.subtitle}>Let's get your kitchen set up</Text>
             </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>Invite code</Text>
-              <Text style={styles.codeValue}>{restaurant.inviteCode}</Text>
-            </View>
-            <View style={[styles.row, styles.rowLast]}>
-              <Text style={styles.label}>Restaurant ID</Text>
-              <Text style={styles.value}>{restaurant.id}</Text>
-            </View>
-          </>
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No restaurant data</Text>
-            <Text style={styles.emptyText}>
-              ยังไม่พบข้อมูลร้าน หรือบัญชีนี้ยังไม่ได้เชื่อมกับร้านอาหาร
-            </Text>
-          </View>
-        )}
-      </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>ออกจากระบบ</Text>
-      </TouchableOpacity>
-    </ScrollView>
+            {mode === 'SELECT' && (
+              <View style={styles.optionsContainer}>
+                {user?.role === 'MANAGER' && (
+                  <TouchableOpacity style={styles.optionCard} onPress={() => setMode('CREATE')}>
+                    <Text style={styles.optionIcon}>🏠</Text>
+                    <Text style={styles.optionTitle}>Create a New Restaurant</Text>
+                    <Text style={styles.optionDesc}>สร้างร้านอาหารของคุณ!</Text>
+                  </TouchableOpacity>
+                )}
+
+                {user?.role === 'EMPLOYEE' && (
+                  <TouchableOpacity style={styles.optionCard} onPress={() => setMode('JOIN')}>
+                    <Text style={styles.optionIcon}>🤝</Text>
+                    <Text style={styles.optionTitle}>Join an Existing Team</Text>
+                    <Text style={styles.optionDesc}>I have an invite code from my restaurant manager.</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {mode === 'CREATE' && (
+              <View style={styles.formContainer}>
+                <TouchableOpacity style={styles.backButton} onPress={() => setMode('SELECT')}>
+                  <Text style={styles.backButtonText}>← Back</Text>
+                </TouchableOpacity>
+                <Text style={styles.formTitle}>Name your restaurant</Text>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>RESTAURANT NAME</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. La Maison Kitchen"
+                    placeholderTextColor={theme.textLight}
+                    value={restaurantName}
+                    onChangeText={setRestaurantName}
+                    autoFocus
+                  />
+                </View>
+                <TouchableOpacity style={styles.submitButton} onPress={handleCreateRestaurant} disabled={loading}>
+                  {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitButtonText}>Create Restaurant</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {mode === 'JOIN' && (
+              <View style={styles.formContainer}>
+                <TouchableOpacity style={styles.backButton} onPress={() => setMode('SELECT')}>
+                  <Text style={styles.backButtonText}>← Back</Text>
+                </TouchableOpacity>
+                <Text style={styles.formTitle}>Enter your invite code</Text>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>INVITE CODE</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. AB12CD34"
+                    placeholderTextColor={theme.textLight}
+                    value={inviteCode}
+                    onChangeText={setInviteCode}
+                    autoCapitalize="characters"
+                    autoFocus
+                  />
+                </View>
+                <TouchableOpacity style={styles.submitButton} onPress={handleJoinRestaurant} disabled={loading}>
+                  {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitButtonText}>Join Team</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+            
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    padding: 24,
-    backgroundColor: colors.background,
-    gap: 18,
-  },
-  hero: {
-    gap: 8,
-    marginBottom: 4,
-  },
-  eyebrow: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: colors.accentSoft,
-    color: colors.accentStrong,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  heroTitle: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: '800',
-    color: colors.text,
-    letterSpacing: -0.5,
-  },
-  heroSubtitle: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: colors.textMuted,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 20,
-  },
-  row: {
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  rowLast: {
-    borderBottomWidth: 0,
-    paddingBottom: 0,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSoft,
-    marginBottom: 4,
-  },
-  value: {
-    fontSize: 16,
-    color: colors.text,
-    fontWeight: '600',
-  },
-  rolePill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: colors.accentSoft,
-  },
-  roleText: {
-    color: colors.accentStrong,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  codeValue: {
-    fontSize: 18,
-    color: colors.accentStrong,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 8,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: colors.textMuted,
-  },
-  emptyState: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-  },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 6,
-  },
-  emptyText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.textMuted,
-  },
-  logoutButton: {
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: colors.danger,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoutText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  loadingScreen: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background },
+  container: { flex: 1, backgroundColor: theme.background },
+  keyboardView: { flex: 1 },
+  scrollContent: { flexGrow: 1 }, 
+  
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: 10 },
+  userInfo: { flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 10 },
+  userAvatar: { fontSize: 18, marginRight: 8 },
+  userName: { fontFamily: 'Mali_700Bold', fontSize: 14, color: theme.textDark },
+  logoutButton: { backgroundColor: theme.inputBg, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 12 },
+  logoutButtonText: { fontFamily: 'Mali_700Bold', fontSize: 12, color: theme.danger },
+  
+  content: { flex: 1, paddingHorizontal: 24, justifyContent: 'center', paddingBottom: 120 }, 
+  
+  header: { alignItems: 'center', marginBottom: 40 },
+  icon: { fontSize: 48, marginBottom: 16 },
+  
+  title: { fontFamily: 'Mali_700Bold', fontSize: 24, color: theme.textDark, marginBottom: 8, textAlign: 'center' },
+  subtitle: { fontFamily: 'Mali_400Regular', fontSize: 16, color: theme.textLight, textAlign: 'center' },
+  
+  optionsContainer: { width: '100%', gap: 16 },
+  optionCard: { backgroundColor: theme.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: theme.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
+  optionIcon: { fontSize: 32, marginBottom: 12 },
+  optionTitle: { fontFamily: 'Mali_700Bold', fontSize: 18, color: theme.textDark, marginBottom: 6 },
+  optionDesc: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight, lineHeight: 20 },
+  
+  formContainer: { backgroundColor: theme.card, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 4 },
+  backButton: { alignSelf: 'flex-start', marginBottom: 16, paddingVertical: 8 },
+  backButtonText: { fontFamily: 'Mali_700Bold', fontSize: 14, color: theme.textLight },
+  formTitle: { fontFamily: 'Mali_700Bold', fontSize: 20, color: theme.textDark, marginBottom: 24 },
+  
+  inputGroup: { marginBottom: 24 },
+  label: { fontFamily: 'Mali_700Bold', fontSize: 11, color: theme.textLight, marginBottom: 8, marginLeft: 4, letterSpacing: 1 },
+  input: { fontFamily: 'Mali_400Regular', backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 18, height: 52, fontSize: 15, color: theme.textDark },
+  
+  submitButton: { backgroundColor: theme.primary, height: 56, borderRadius: 99, justifyContent: 'center', alignItems: 'center', shadowColor: theme.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
+  submitButtonText: { fontFamily: 'Mali_700Bold', color: '#FFFFFF', fontSize: 16 },
 });

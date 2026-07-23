@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import * as Keychain from 'react-native-keychain';
-import apiClient from '../api/client';
+import * as SecureStore from 'expo-secure-store';
+// 🔴 1. แก้ไข Import โดยเพิ่ม setGlobalToken เข้ามา
+import apiClient, { setGlobalToken } from '../api/client'; 
 import { User } from '../types';
 
 interface AuthContextType {
@@ -9,11 +10,12 @@ interface AuthContextType {
   user: User | null;
   login: (token: string, userData: User) => Promise<void>;
   logout: () => Promise<void>;
+  setUser: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// In-memory fallback for environments without Keychain support
+// In-memory fallback for environments without SecureStore support
 let tokenFallback = '';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -27,16 +29,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         let token = '';
         try {
-          const credentials = await Keychain.getGenericPassword();
-          if (credentials) {
-            token = credentials.password;
+          // รับค่าเป็น String ตรงๆ จาก SecureStore
+          const storedToken = await SecureStore.getItemAsync('token');
+          if (storedToken) {
+            token = storedToken;
           }
         } catch (e) {
-          console.warn('Keychain not available, using fallback storage');
+          console.warn('SecureStore not available, using fallback storage');
           token = tokenFallback;
         }
 
         if (token) {
+          // 🔴 2. เติมบรรทัดนี้ เพื่อฝัง Token ลงไปใน API Client
+          setGlobalToken(token); 
+          
           const response = await apiClient.get<User>('/auth/me');
           setUser(response.data);
           setIsAuthenticated(true);
@@ -46,9 +52,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (error) {
         console.error('Authentication check failed:', error);
         try {
-          await Keychain.resetGenericPassword();
+          // ใช้ deleteItemAsync แทน Keychain
+          await SecureStore.deleteItemAsync('token');
         } catch (_) {}
         tokenFallback = '';
+        // 🔴 3. ล้างค่า Token เผื่อกรณีดึงข้อมูลพลาด
+        setGlobalToken(null); 
         setIsAuthenticated(false);
       } finally {
         setIsLoading(false);
@@ -59,10 +68,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (token: string, userData: User) => {
+    // 🔴 4. อัปเดต Token ตอน Login
+    setGlobalToken(token); 
+    
     try {
-      await Keychain.setGenericPassword('session_token', token);
+      // ใช้ setItemAsync แทน Keychain
+      await SecureStore.setItemAsync('token', token);
     } catch (e) {
-      console.warn('Keychain not available to save, using fallback');
+      console.warn('SecureStore not available to save, using fallback');
     }
     tokenFallback = token;
     setUser(userData);
@@ -70,6 +83,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    // 🔴 5. ล้างค่า Token ตอน Logout
+    setGlobalToken(null); 
+    
     try {
       await apiClient.post('/auth/logout');
     } catch (e) {
@@ -77,9 +93,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      await Keychain.resetGenericPassword();
+      // ใช้ deleteItemAsync แทน Keychain
+      await SecureStore.deleteItemAsync('token');
     } catch (e) {
-      console.warn('Keychain not available to reset');
+      console.warn('SecureStore not available to reset');
     }
     tokenFallback = '';
     setUser(null);
@@ -87,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isLoading, user, login, logout }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, isAuthenticated, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

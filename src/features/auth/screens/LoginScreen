@@ -1,0 +1,311 @@
+import React, { useState, useEffect } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ImageBackground,
+  Animated,
+} from 'react-native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { authApi } from '../../../api/auth';
+import { useAuth } from '../../../context/AuthContext';
+import { AuthStackParamList } from '../../../navigation/AuthNavigator';
+import { colors } from '../../../theme/colors';
+
+// นำเข้าฟอนต์ Mali
+import { useFonts, Mali_400Regular, Mali_700Bold } from '@expo-google-fonts/mali';
+
+type LoginScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Login'>;
+
+interface Props {
+  navigation: LoginScreenNavigationProp;
+}
+
+// คอมโพเนนต์สำหรับเอฟเฟกต์หัวใจ
+const FloatingHeart = ({ x, y, onComplete }: { x: number, y: number, onComplete: () => void }) => {
+  const [animation] = useState(new Animated.Value(0));
+
+  useEffect(() => {
+    Animated.timing(animation, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start(() => onComplete());
+  }, []);
+
+  const translateY = animation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -50],
+  });
+  const opacity = animation.interpolate({
+    inputRange: [0, 0.8, 1],
+    outputRange: [1, 1, 0],
+  });
+
+  return (
+    <Animated.View style={[styles.heartContainer, { top: y - 20, left: x - 10, opacity, transform: [{ translateY }] }]}>
+      <Text style={styles.heartText}>🩷</Text>
+    </Animated.View>
+  );
+};
+
+export default function LoginScreen({ navigation }: Props) {
+  const { login } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [hearts, setHearts] = useState<{ id: number; x: number; y: number }[]>([]);
+
+  // โหลดฟอนต์
+  let [fontsLoaded] = useFonts({ Mali_400Regular, Mali_700Bold });
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('ข้อผิดพลาด', 'กรุณากรอกข้อมูลให้ครบถ้วน');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await authApi.login({ email, password });
+      await login(response.token, response.user);
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        'รหัสผ่านไม่ถูกต้อง หรือเชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+      Alert.alert('การเข้าสู่ระบบล้มเหลว', message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ฟังก์ชันสร้างหัวใจ (รับ Event เพื่อเอาพิกัด)
+  const triggerHeart = (evt: any) => {
+    const { pageX, pageY } = evt.nativeEvent;
+    setHearts((prev) => [...prev, { id: Date.now(), x: pageX, y: pageY }]);
+  };
+
+  const removeHeart = (id: number) => {
+    setHearts((prev) => prev.filter((h) => h.id !== id));
+  };
+
+  // รอให้ฟอนต์โหลดเสร็จก่อนแสดงผล
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#FF9EBB" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}> 
+      <ImageBackground
+        source={require('../../../../assets/wallpaperpj4.png')} 
+        style={styles.backgroundImage}
+        blurRadius={0} // ปรับเป็น 0 เพื่อไม่ให้เบลอ (ถ้าอยากให้เบลอก็แก้กลับเป็น 3)
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
+        >
+          <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+            <View style={styles.hero}>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>Smart Expiry</Text>
+              </View>
+              <Text style={styles.heroTitle}>Hello, welcome back!</Text>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Sign in</Text>
+              <Text style={styles.subtitle}>กรอกอีเมลและรหัสผ่านของบัญชีผู้ใช้งาน</Text>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="example@yourrestaurant.com"
+                  placeholderTextColor={colors.textSoft || '#B0B0B0'}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={email}
+                  onChangeText={setEmail}
+                  onTouchStart={triggerHeart} // ผูก Event ให้หัวใจเด้งตอนแตะช่องนี้
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Password</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.textSoft || '#B0B0B0'}
+                  secureTextEntry
+                  value={password}
+                  onChangeText={setPassword}
+                  onTouchStart={triggerHeart} // ผูก Event ให้หัวใจเด้งตอนแตะช่องนี้
+                />
+              </View>
+
+              <TouchableOpacity 
+                style={styles.button} 
+                onPress={handleLogin} 
+                disabled={loading}
+                onPressIn={triggerHeart} // ผูก Event ให้หัวใจเด้งตอนกดปุ่ม
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.buttonText}>Continue</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.linkButton} 
+                onPress={() => navigation.navigate('Register')}
+              >
+                <Text style={styles.linkText}>
+                  ยังไม่มีบัญชี? <Text style={styles.linkAccent}>สร้างบัญชีใหม่</Text>
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+
+        {/* เรนเดอร์หัวใจ */}
+        {hearts.map((heart) => (
+          <FloatingHeart key={heart.id} x={heart.x} y={heart.y} onComplete={() => removeHeart(heart.id)} />
+        ))}
+      </ImageBackground>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 24,
+    gap: 20,
+  },
+  hero: {
+    gap: 10,
+  },
+  badge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: '#FFE4E1',
+    borderWidth: 1,
+    borderColor: '#FFC0CB',
+  },
+  badgeText: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 12,
+    color: '#FF69B4',
+    textTransform: 'uppercase',
+  },
+  heroTitle: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 28,
+    color: '#333333', // ปรับเป็นสีเข้มให้ตัดกับพื้นหลัง
+  },
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderRadius: 24,
+    padding: 32,
+    shadowColor: '#FFB6C1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 5,
+  },
+  sectionTitle: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 24,
+    color: '#333',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontFamily: 'Mali_400Regular',
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 24,
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 8,
+  },
+  input: {
+    fontFamily: 'Mali_400Regular',
+    height: 54,
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1,
+    borderColor: '#FFF0F5',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    fontSize: 14,
+    color: '#333',
+  },
+  button: {
+    height: 54,
+    backgroundColor: '#FF9EBB',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+    shadowColor: '#FF9EBB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
+  buttonText: {
+    fontFamily: 'Mali_700Bold',
+    color: '#FFFFFF',
+    fontSize: 18,
+  },
+  linkButton: {
+    marginTop: 24,
+    alignItems: 'center',
+  },
+  linkText: {
+    fontFamily: 'Mali_400Regular',
+    fontSize: 14,
+    color: '#888',
+  },
+  linkAccent: {
+    fontFamily: 'Mali_700Bold',
+    color: '#FF9EBB',
+  },
+  heartContainer: {
+    position: 'absolute',
+    pointerEvents: 'none',
+    zIndex: 10, // ให้มั่นใจว่าลอยอยู่บนสุด
+  },
+  heartText: {
+    fontSize: 24,
+  },
+});
