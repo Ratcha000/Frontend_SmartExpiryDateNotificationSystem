@@ -1,12 +1,9 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
-import LoginScreen from '../features/auth/screens/LoginScreen';
-import RegisterScreen from '../features/auth/screens/RegisterScreen';
-import { colors } from '../theme/colors';
+import LogInScreen from '../features/auth/screens/LogInScreen'; // หรือชื่อไฟล์ที่คุณเอาโค้ดใหม่ไปวางทับ
 
 export type AuthStackParamList = {
-  Login: undefined;
-  Register: undefined;
+  LogIn: undefined; // เปลี่ยนชื่อ Route ให้สอดคล้อง
 };
 
 const Stack = createStackNavigator<AuthStackParamList>();
@@ -14,28 +11,15 @@ const Stack = createStackNavigator<AuthStackParamList>();
 const AuthNavigator = () => {
   return (
     <Stack.Navigator
-      initialRouteName="Login"
+      initialRouteName="LogIn" // ตั้งค่าให้เปิดมาเจอหน้าแรกนี้ทันที
       screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.surface,
-        },
-        headerTintColor: colors.text,
-        headerTitleStyle: {
-          fontWeight: '700',
-        },
-        headerShadowVisible: false,
-        cardStyle: { backgroundColor: colors.background },
+        headerShown: false,
+        cardStyle: { backgroundColor: 'transparent' },
       }}
     >
       <Stack.Screen
-        name="Login"
-        component={LoginScreen}
-        options={{ title: 'Sign in' }}
-      />
-      <Stack.Screen
-        name="Register"
-        component={RegisterScreen}
-        options={{ title: 'Create account' }}
+        name="LogIn"
+        component={LogInScreen}
       />
     </Stack.Navigator>
   );

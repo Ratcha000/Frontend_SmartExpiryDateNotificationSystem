@@ -4,6 +4,8 @@ import { User } from '../types';
 export interface AuthResponse {
   token: string;
   user: User;
+  accessToken?: string;
+  refreshToken?: string;
 }
 
 export interface RegisterPayload {
