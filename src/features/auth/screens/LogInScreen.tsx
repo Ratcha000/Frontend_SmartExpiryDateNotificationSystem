@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -11,22 +10,24 @@ import {
   View,
   Animated,
   ScrollView,
+  Modal,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { authApi } from '../../../api/auth';
 import { useAuth } from '../../../context/AuthContext';
 import { useFonts, Mali_400Regular, Mali_700Bold } from '@expo-google-fonts/mali';
 
-// ---------------- โทนสีใหม่ (น้ำตาล - ครีม) ----------------
 const theme = {
-  background: '#F5F3E9', // ครีมอ่อนพื้นหลัง
-  card: '#FFFFFF',       // ขาว
-  primary: '#4A3623',    // น้ำตาลเข้ม (แทนสีดำ)
-  inputBg: '#EBE7E0',    // ครีมเทา สำหรับช่องกรอกข้อมูล
-  textLight: '#8D867E',  // เทาน้ำตาล สำหรับ Label
-  textDark: '#382512',   // น้ำตาลเข้มสุด สำหรับข้อความหลัก
+  background: '#F5F3E9',
+  card: '#FFFFFF',       
+  primary: '#4A3623',    
+  inputBg: '#EBE7E0',    
+  textLight: '#8D867E',  
+  textDark: '#382512',
+  danger: '#D9534F',
+  success: '#10B981',
 };
 
-// ---------------- เอฟเฟกต์หัวใจ ----------------
 const FloatingHeart = ({ x, y, onComplete }: { x: number, y: number, onComplete: () => void }) => {
   const [animation] = useState(new Animated.Value(0));
 
@@ -54,7 +55,7 @@ const FloatingHeart = ({ x, y, onComplete }: { x: number, y: number, onComplete:
   );
 };
 
-export default function HomeScreen() {
+export default function LogInScreen() {
   const { login } = useAuth();
   const [fontsLoaded] = useFonts({ Mali_400Regular, Mali_700Bold });
 
@@ -67,6 +68,21 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false); 
   const [hearts, setHearts] = useState<{ id: number; x: number; y: number }[]>([]);
+
+  const [modalConfig, setModalConfig] = useState({
+    visible: false,
+    type: 'error' as 'error' | 'success',
+    title: '',
+    message: '',
+  });
+
+  const showModal = (type: 'error' | 'success', title: string, message: string) => {
+    setModalConfig({ visible: true, type, title, message });
+  };
+
+  const closeModal = () => {
+    setModalConfig(prev => ({ ...prev, visible: false }));
+  };
 
   const triggerHeart = (evt: any) => {
     const { pageX, pageY } = evt.nativeEvent;
@@ -87,26 +103,40 @@ export default function HomeScreen() {
 
   const handleSubmit = async (evt: any) => {
     triggerHeart(evt);
+    
     if (activeTab === 'LOGIN') {
-      if (!email || !password) return Alert.alert('ข้อผิดพลาด', 'กรุณากรอกข้อมูลให้ครบถ้วน');
+      if (!email || !password) return showModal('error', 'ข้อผิดพลาด', 'กรุณากรอกข้อมูลให้ครบถ้วน');
       setLoading(true);
       try {
         const response = await authApi.login({ email, password });
-        // 🔴 อย่าลืม: เปลี่ยนตรงนี้ให้ตรงกับตัวแปรจาก JSON ของ Backend (เช่น accessToken)
-        await login(response.accessToken || response.token, response.user);
+        
+        const raw = response as any;
+        const token = raw?.token || raw?.data?.token || raw?.accessToken || raw?.data?.accessToken;
+        const userData = raw?.user || raw?.data?.user;
+        
+        if (!token) throw new Error('ไม่พบ Token จากเซิร์ฟเวอร์');
+        
+        await login(token, userData);
       } catch (err: any) {
-        Alert.alert('การเข้าสู่ระบบล้มเหลว', err?.response?.data?.message || err?.message || 'รหัสผ่านไม่ถูกต้อง');
+        showModal('error', 'การเข้าสู่ระบบล้มเหลว', err?.response?.data?.message || err?.message || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
       } finally {
         setLoading(false);
       }
     } else {
-      if (!email || !displayName || !password) return Alert.alert('ข้อผิดพลาด', 'กรุณากรอกข้อมูลให้ครบถ้วน');
+      if (!email || !displayName || !password) return showModal('error', 'ข้อผิดพลาด', 'กรุณากรอกข้อมูลให้ครบถ้วน');
       setLoading(true);
       try {
         const response = await authApi.register({ email, displayName, password, role, restaurantId: null });
-        await login(response.accessToken || response.token, response.user);
+        
+        const raw = response as any;
+        const token = raw?.token || raw?.data?.token || raw?.accessToken || raw?.data?.accessToken;
+        const userData = raw?.user || raw?.data?.user;
+        
+        if (!token) throw new Error('ไม่พบ Token จากเซิร์ฟเวอร์');
+
+        await login(token, userData);
       } catch (err: any) {
-        Alert.alert('การสมัครสมาชิกล้มเหลว', err?.response?.data?.message || err?.message || 'เกิดข้อผิดพลาด');
+        showModal('error', 'การสมัครสมาชิกล้มเหลว', err?.response?.data?.message || err?.message || 'เกิดข้อผิดพลาด');
       } finally {
         setLoading(false);
       }
@@ -115,18 +145,24 @@ export default function HomeScreen() {
 
   if (!fontsLoaded) return <View style={styles.loadingScreen}><ActivityIndicator size="large" color={theme.primary} /></View>;
 
+  const isError = modalConfig.type === 'error';
+  const modalIconName = isError ? 'x-circle' : 'check-circle';
+  const modalIconColor = isError ? theme.danger : theme.success;
+  const modalIconBgColor = isError ? '#FEF2F2' : '#D1FAE5';
+
   return (
     <KeyboardAvoidingView 
       style={styles.container} 
-      // 🔴 แก้ไข: บังคับใช้ 'height' สำหรับ Android
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      // 🔴 แก้ไข: ปิดการดันหน้าจอใน Android (ใช้ undefined) ให้ระบบมันจัดการเลื่อนเองธรรมชาติ
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView 
         contentContainerStyle={styles.scrollContent} 
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        bounces={false}
+        overScrollMode="never" // 🔴 แก้ไข: ล็อคไม่ให้ดึงหน้าจอเกินใน Android ขอบล่างจะได้ไม่ลอย
       >
-        {/* ---------------- Header ---------------- */}
         <View style={styles.header}>
           <View style={styles.logoBox}>
             <Text style={styles.logoIcon}>📦</Text>
@@ -135,10 +171,7 @@ export default function HomeScreen() {
           <Text style={styles.mainSubtitle}>Kitchen Expiry Management</Text>
         </View>
 
-        {/* ---------------- Card ฟอร์ม ---------------- */}
         <View style={styles.card}>
-          
-          {/* แท็บ Sign In / Register */}
           <View style={styles.tabContainer}>
             <TouchableOpacity 
               style={[styles.tab, activeTab === 'LOGIN' && styles.activeTab]} 
@@ -155,9 +188,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* ฟอร์ม */}
           <View style={styles.formContainer}>
-            
             {activeTab === 'REGISTER' && (
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>DISPLAY NAME</Text>
@@ -232,7 +263,6 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {/* ปุ่ม Submit */}
             <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}>
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
@@ -242,16 +272,38 @@ export default function HomeScreen() {
                 </Text>
               )}
             </TouchableOpacity>
-
           </View>
         </View>
-
       </ScrollView>
 
-      {/* เรนเดอร์หัวใจ */}
       {hearts.map((heart) => (
         <FloatingHeart key={heart.id} x={heart.x} y={heart.y} onComplete={() => removeHeart(heart.id)} />
       ))}
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalConfig.visible}
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={[styles.modalIconBg, { backgroundColor: modalIconBgColor }]}>
+              <Feather name={modalIconName} size={32} color={modalIconColor} />
+            </View>
+            <Text style={styles.modalTitle}>{modalConfig.title}</Text>
+            <Text style={styles.modalMessage}>{modalConfig.message}</Text>
+            <View style={styles.modalButtonGroup}>
+              <TouchableOpacity 
+                style={[styles.modalButtonConfirm, { backgroundColor: theme.primary }]} 
+                onPress={closeModal}
+              >
+                <Text style={styles.modalButtonConfirmText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -264,11 +316,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    // 🔴 แก้ไข: เพิ่มพื้นที่ด้านล่างสุด เพื่อให้คีย์บอร์ดไม่บังตอนเลื่อนลงมาสุด
-    
   },
   
-  // -- Header --
   header: {
     alignItems: 'center',
     marginTop: Platform.OS === 'ios' ? 80 : 60,
@@ -301,15 +350,14 @@ const styles = StyleSheet.create({
     color: theme.textLight 
   },
 
-  // -- Card --
   card: {
-    flex: 1,
+    flex: 1, // 🔴 ให้การ์ดสีขาวยืดไปเติมพื้นที่หน้าจอที่เหลือโดยอัตโนมัติ
     backgroundColor: theme.card,
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
     paddingHorizontal: 24,
     paddingTop: 32,
-    paddingBottom: 40,
+    paddingBottom: 40, // 🔴 เอา 200 ออก กลับมาใช้ขนาดปกติ ขอบล่างจะได้ไม่ยาวเกินเบอร์
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -5 },
     shadowOpacity: 0.05,
@@ -317,7 +365,6 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
 
-  // -- Tabs --
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: theme.inputBg,
@@ -349,7 +396,6 @@ const styles = StyleSheet.create({
     color: theme.textDark 
   },
 
-  // -- Forms --
   formContainer: {
     width: '100%',
   },
@@ -374,7 +420,6 @@ const styles = StyleSheet.create({
     color: theme.textDark,
   },
   
-  // -- Password Wrapper & Eye Icon --
   passwordWrapper: {
     position: 'relative',
     justifyContent: 'center',
@@ -399,7 +444,6 @@ const styles = StyleSheet.create({
     color: theme.textLight,
   },
 
-  // -- Role Selector --
   roleContainer: { 
     flexDirection: 'row', 
     gap: 12 
@@ -425,7 +469,6 @@ const styles = StyleSheet.create({
     color: '#FFF' 
   },
 
-  // -- Submit Button --
   submitButton: {
     backgroundColor: theme.primary,
     height: 56,
@@ -445,7 +488,6 @@ const styles = StyleSheet.create({
     fontSize: 16 
   },
 
-  // -- Heart Effect --
   heartContainer: { 
     position: 'absolute', 
     pointerEvents: 'none', 
@@ -453,5 +495,64 @@ const styles = StyleSheet.create({
   },
   heartText: { 
     fontSize: 24 
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(74, 54, 35, 0.4)', 
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContainer: {
+    backgroundColor: theme.card,
+    width: '100%',
+    borderRadius: 32,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  modalIconBg: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 22,
+    color: theme.textDark,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontFamily: 'Mali_400Regular',
+    fontSize: 15,
+    color: theme.textLight,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  modalButtonGroup: {
+    flexDirection: 'row',
+    width: '100%',
+  },
+  modalButtonConfirm: {
+    flex: 1,
+    height: 52,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalButtonConfirmText: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 15,
+    color: '#FFF',
   },
 });

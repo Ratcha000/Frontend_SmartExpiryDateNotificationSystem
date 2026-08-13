@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -7,9 +7,12 @@ import {
   TouchableOpacity, 
   Platform, 
   ActivityIndicator, 
-  RefreshControl 
+  RefreshControl,
+  Modal,
+  TouchableWithoutFeedback
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../../context/AuthContext';
 import apiClient from '../../../api/client';
 
@@ -30,18 +33,17 @@ const theme = {
   
   badgeBg: '#F3E8E8',
   badgeText: '#D9534F',
+  border: '#E8E6E1',
+  danger: '#DC2626',
 };
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }: any) {
   const { user } = useAuth();
   const isManager = user?.role === 'MANAGER';
 
-  // ---------------- State สำหรับข้อมูลจริงจาก API ----------------
   const [userData, setUserData] = useState<any>(user);
   const [restaurantData, setRestaurantData] = useState<any>(null);
-  const [memberCount, setMemberCount] = useState<number>(0);
   
-  // State สำหรับ Items (ดึงจริงเมื่อ Backend เพิ่ม Endpoint ฝั่ง Stock)
   const [actionItems, setActionItems] = useState<any[]>([]);
   const [stats, setStats] = useState({
     totalItems: 0,
@@ -53,41 +55,59 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
-  // ---------------- ฟังก์ชันดึงข้อมูลจาก API จริง ----------------
+  const [showNotificationPopup, setShowNotificationPopup] = useState(false);
+  const [hasReadNotifications, setHasReadNotifications] = useState(false);
+  
+  // 🔴 ใช้ useRef เพื่อจดจำจำนวนล่าสุดแบบไม่ถูกรีเซ็ตเวลาสลับหน้า
+  const prevActionCount = useRef(0); 
+
   const fetchHomeData = async () => {
     try {
-      // 1. ดึงข้อมูล User ปัจจุบันจาก GET /api/auth/me
       const resUser = await apiClient.get('/auth/me');
       setUserData(resUser.data);
 
-      // 2. ถ้า User มีร้านค้า ให้ดึงข้อมูลร้านจาก GET /api/restaurants/me
       if (resUser.data?.restaurantId) {
         const resRest = await apiClient.get('/restaurants/me');
         setRestaurantData(resRest.data);
 
-        // 3. ดึงจำนวนสมาชิกจริงในร้านจาก GET /api/restaurants/{id}/members
-        if (resRest.data?.id) {
-          const resMembers = await apiClient.get(`/restaurants/${resRest.data.id}/members`);
-          setMemberCount(resMembers.data?.length || 0);
-        }
+        const resInv = await apiClient.get(`/ingredients?restaurantId=${resUser.data.restaurantId}`);
+        const activeItems = resInv.data.filter((item: any) => item.status !== 'DELETED');
+        
+        const expiring = activeItems.filter((item: any) => item.expiring);
+        const expired = activeItems.filter((item: any) => item.expired || item.status === 'EXPIRED');
+        const lowStock = activeItems.filter((item: any) => item.quantity <= (item.initialQuantity * 0.20));
 
-        // 4. (เตรียมไว้สำหรับดึงรายการสินค้าจริงเมื่อ Backend เปิดใช้ API Stock)
-        // const resItems = await apiClient.get('/items');
-        // setActionItems(resItems.data);
+        setStats({
+          totalItems: activeItems.length,
+          expiringSoon: expiring.length,
+          expired: expired.length,
+          lowStock: lowStock.length,
+        });
+
+        const newActionItems = [...expiring, ...expired];
+        
+        // 🔴 เช็คจาก prevActionCount.current จะแม่นยำกว่า
+        if (newActionItems.length > prevActionCount.current) {
+          setHasReadNotifications(false);
+        }
+        
+        prevActionCount.current = newActionItems.length;
+        setActionItems(newActionItems);
       }
-    } catch (error) {
-      console.error('Error fetching Home data from API:', error);
+    } catch (error: any) {
+      console.log('Error fetching Home data from API:', error?.message);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchHomeData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchHomeData();
+    }, [user])
+  );
 
-  // ฟังก์ชันรองรับการลากลงเพื่อรีเฟรชข้อมูล (Pull to Refresh)
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchHomeData();
@@ -105,126 +125,172 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScrollView 
-      style={styles.container} 
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} />
-      }
-    >
-      
-      {/* ---------------- 1. Header (ข้อมูลจาก Auth API) ---------------- */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.dateText}>{today}</Text>
-          <Text style={styles.greetingText}>Good morning, {displayName}</Text>
-          {restaurantData?.name && (
-            <Text style={styles.restaurantSubtext}>📍 {restaurantData.name}</Text>
-          )}
-        </View>
-        <TouchableOpacity style={styles.notificationBtn}>
-          <Feather name="bell" size={24} color={theme.textDark} />
-          {actionItems.length > 0 && (
-            <View style={styles.badgeContainer}>
-              <Text style={styles.badgeNumber}>{actionItems.length}</Text>
+    <View style={styles.container}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} />}
+      >
+        
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.dateText}>{today}</Text>
+            <Text style={styles.greetingText}>Good morning, {displayName}</Text>
+            <View style={styles.locationRow}>
+              <Feather name="map-pin" size={12} color={theme.danger} />
+              <Text style={styles.restaurantSubtext}>{restaurantData?.name || 'No Workspace'}</Text>
             </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* ---------------- 2. Stats Grid ---------------- */}
-      <View style={styles.statsGrid}>
-        <View style={[styles.statCard, { backgroundColor: theme.card }]}>
-          <Text style={styles.statTitle}>TOTAL ITEMS</Text>
-          <Text style={[styles.statValue, { color: theme.textDark }]}>{stats.totalItems}</Text>
-          <Text style={styles.statDesc}>in inventory</Text>
-        </View>
-        
-        <View style={[styles.statCard, { backgroundColor: theme.cardExpiring }]}>
-          <Text style={styles.statTitle}>EXPIRING SOON</Text>
-          <Text style={[styles.statValue, { color: theme.textExpiring }]}>{stats.expiringSoon}</Text>
-          <Text style={styles.statDesc}>within 3 days</Text>
-        </View>
-        
-        <View style={[styles.statCard, { backgroundColor: theme.cardExpired }]}>
-          <Text style={styles.statTitle}>EXPIRED</Text>
-          <Text style={[styles.statValue, { color: theme.textExpired }]}>{stats.expired}</Text>
-          <Text style={styles.statDesc}>needs removal</Text>
-        </View>
-        
-        <View style={[styles.statCard, { backgroundColor: theme.cardLowStock }]}>
-          <Text style={styles.statTitle}>LOW STOCK</Text>
-          <Text style={[styles.statValue, { color: theme.textLowStock }]}>{stats.lowStock}</Text>
-          <Text style={styles.statDesc}>below par level</Text>
-        </View>
-      </View>
-
-      {/* ---------------- 3. Needs Action Today ---------------- */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Needs Action Today</Text>
-        <View style={styles.sectionBadge}>
-          <Text style={styles.sectionBadgeText}>{actionItems.length} items</Text>
-        </View>
-      </View>
-
-      <View style={styles.actionList}>
-        {actionItems.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Feather name="check-circle" size={32} color={theme.textLight} />
-            <Text style={styles.emptyText}>No items requiring action today</Text>
           </View>
-        ) : (
-          actionItems.map((item) => (
-            <View key={item.id} style={styles.actionCard}>
-              <View style={styles.actionInfo}>
-                <View style={styles.dotIndicator} />
-                <View>
-                  <Text style={styles.actionName}>{item.name}</Text>
-                  <Text style={styles.actionDesc}>
-                    {item.quantity} • <Text style={{ color: theme.textExpiring }}>{item.timeLeft}</Text>
+          
+          <TouchableOpacity 
+            style={styles.notificationBtn}
+            onPress={() => {
+              setShowNotificationPopup(true);
+              setHasReadNotifications(true);
+            }}
+          >
+            <Feather name="bell" size={24} color={theme.textDark} />
+            {actionItems.length > 0 && !hasReadNotifications && (
+              <View style={styles.badgeContainer}>
+                <Text style={styles.badgeNumber}>{actionItems.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.statsGrid}>
+          <View style={[styles.statCard, { backgroundColor: theme.card }]}>
+            <Text style={styles.statTitle}>TOTAL ITEMS</Text>
+            <Text style={[styles.statValue, { color: theme.textDark }]}>{stats.totalItems}</Text>
+            <Text style={styles.statDesc}>in inventory</Text>
+          </View>
+          
+          <View style={[styles.statCard, { backgroundColor: theme.cardExpiring }]}>
+            <Text style={styles.statTitle}>EXPIRING SOON</Text>
+            <Text style={[styles.statValue, { color: theme.textExpiring }]}>{stats.expiringSoon}</Text>
+            <Text style={styles.statDesc}>within 3 days</Text>
+          </View>
+          
+          <View style={[styles.statCard, { backgroundColor: theme.cardExpired }]}>
+            <Text style={styles.statTitle}>EXPIRED</Text>
+            <Text style={[styles.statValue, { color: theme.textExpired }]}>{stats.expired}</Text>
+            <Text style={styles.statDesc}>needs removal</Text>
+          </View>
+          
+          <View style={[styles.statCard, { backgroundColor: theme.cardLowStock }]}>
+            <Text style={styles.statTitle}>LOW STOCK</Text>
+            <Text style={[styles.statValue, { color: theme.textLowStock }]}>{stats.lowStock}</Text>
+            <Text style={styles.statDesc}>below par level</Text>
+          </View>
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Needs Action Today</Text>
+          <View style={styles.sectionBadge}>
+            <Text style={styles.sectionBadgeText}>{actionItems.length} items</Text>
+          </View>
+        </View>
+
+        <View style={styles.actionList}>
+          {actionItems.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Feather name="check-circle" size={32} color={theme.textLight} />
+              <Text style={styles.emptyText}>No items requiring action today</Text>
+            </View>
+          ) : (
+            actionItems.map((item) => (
+              <View key={item.id} style={styles.actionCard}>
+                <View style={styles.actionInfo}>
+                  <View style={[styles.dotIndicator, { backgroundColor: item.expired || item.status === 'EXPIRED' ? theme.textExpired : theme.textExpiring }]} />
+                  <View>
+                    <Text style={styles.actionName}>{item.name}</Text>
+                    <Text style={styles.actionDesc}>
+                      {item.quantity} {item.unit} • <Text style={{ color: item.expired || item.status === 'EXPIRED' ? theme.textExpired : theme.textExpiring }}>
+                        {item.daysLeft < 0 ? `${Math.abs(item.daysLeft)} days overdue` : `${item.daysLeft} days left`}
+                      </Text>
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: item.expired || item.status === 'EXPIRED' ? theme.cardExpired : theme.cardExpiring }]}>
+                  <Text style={[styles.statusBadgeText, { color: item.expired || item.status === 'EXPIRED' ? theme.textExpired : theme.textExpiring }]}>
+                    {item.expired || item.status === 'EXPIRED' ? 'Expired' : 'Near Expiry'}
                   </Text>
                 </View>
               </View>
-              <View style={styles.statusBadge}>
-                <View style={[styles.dotIndicator, { backgroundColor: theme.textExpiring }]} />
-                <Text style={styles.statusBadgeText}>{item.status}</Text>
-              </View>
-            </View>
-          ))
-        )}
-      </View>
+            ))
+          )}
+        </View>
 
-      {/* ---------------- 4. Quick Actions ---------------- */}
-      <Text style={styles.sectionTitle}>Quick Actions</Text>
-      <View style={styles.quickActionsGrid}>
-        
-        <TouchableOpacity style={[styles.quickBtn, styles.quickBtnPrimary]}>
-          <Feather name="maximize" size={24} color="#FFF" />
-          <Text style={[styles.quickBtnText, { color: '#FFF' }]}>Scan</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.quickBtn}>
-          <Feather name="plus" size={24} color={theme.textDark} />
-          <Text style={styles.quickBtnText}>Add Item</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.quickBtn}>
-          <Feather name="book-open" size={24} color={theme.textDark} />
-          <Text style={styles.quickBtnText}>Menu AI</Text>
-        </TouchableOpacity>
-        
-        {/* แสดงผลเฉพาะ Manager ตามสิทธิ์ Role ที่ดึงมาจาก API */}
-        {isManager && (
-          <TouchableOpacity style={styles.quickBtn}>
-            <Feather name="shopping-cart" size={24} color={theme.textDark} />
-            <Text style={styles.quickBtnText}>Buy Plan</Text>
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.quickActionsGrid}>
+          
+          <TouchableOpacity style={[styles.quickBtn, styles.quickBtnPrimary]}>
+            <Feather name="maximize" size={24} color="#FFF" />
+            <Text style={[styles.quickBtnText, { color: '#FFF' }]}>Scan</Text>
           </TouchableOpacity>
-        )}
-      </View>
+          
+          <TouchableOpacity 
+            style={styles.quickBtn}
+            onPress={() => navigation.navigate('AddIngredient')}
+          >
+            <Feather name="plus" size={24} color={theme.textDark} />
+            <Text style={styles.quickBtnText}>Add Item</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.quickBtn}>
+            <Feather name="book-open" size={24} color={theme.textDark} />
+            <Text style={styles.quickBtnText}>Menu AI</Text>
+          </TouchableOpacity>
+          
+          {isManager && (
+            <TouchableOpacity style={styles.quickBtn}>
+              <Feather name="shopping-cart" size={24} color={theme.textDark} />
+              <Text style={styles.quickBtnText}>Buy Plan</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-      <View style={{ height: 100 }} />
+        <View style={{ height: 100 }} />
+      </ScrollView>
 
-    </ScrollView>
+      <Modal
+        visible={showNotificationPopup}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowNotificationPopup(false)}
+      >
+        <TouchableOpacity 
+          style={styles.popupOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowNotificationPopup(false)} 
+        >
+          <TouchableWithoutFeedback>
+            <View style={styles.popupContent}>
+              <Text style={styles.popupTitle}>Unread Notifications</Text>
+              
+              {actionItems.length === 0 ? (
+                <Text style={styles.popupEmptyText}>You're all caught up!</Text>
+              ) : (
+                <>
+                  {actionItems.slice(0, 3).map((item, idx) => (
+                    <View key={`popup-${idx}`} style={styles.popupItemRow}>
+                      <View style={[styles.popupDot, { backgroundColor: item.expired ? theme.textExpired : theme.textExpiring }]} />
+                      <Text style={styles.popupItemText} numberOfLines={1}>
+                        {item.name} <Text style={{ color: theme.textLight }}>- {item.expired ? 'Expired' : 'Expiring soon'}</Text>
+                      </Text>
+                    </View>
+                  ))}
+                  
+                  {actionItems.length > 3 && (
+                    <Text style={styles.popupMoreText}>+{actionItems.length - 3} more items...</Text>
+                  )}
+                </>
+              )}
+            </View>
+          </TouchableWithoutFeedback>
+        </TouchableOpacity>
+      </Modal>
+
+    </View>
   );
 }
 
@@ -254,29 +320,36 @@ const styles = StyleSheet.create({
     color: theme.textLight,
     letterSpacing: 1,
     marginBottom: 4,
+    textTransform: 'uppercase',
   },
   greetingText: {
     fontFamily: 'Mali_700Bold',
     fontSize: 24,
     color: theme.textDark,
   },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
   restaurantSubtext: {
     fontFamily: 'Mali_400Regular',
     fontSize: 13,
     color: theme.textLight,
-    marginTop: 2,
   },
   notificationBtn: {
     backgroundColor: theme.card,
     padding: 12,
     borderRadius: 99,
     position: 'relative',
+    marginRight: 6, // 🔴 ดันเข้ามาไม่ให้ชิดขอบจอเกินไป
   },
   badgeContainer: {
     position: 'absolute',
     top: -4,
-    right: -4,
-    backgroundColor: theme.badgeText,
+    right: -2, // 🔴 ลดระยะยื่น เพื่อไม่ให้ตัวเลขตกขอบ
+    backgroundColor: theme.danger,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -284,11 +357,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: theme.background,
+    paddingHorizontal: 4,
   },
   badgeNumber: {
     color: '#FFF',
     fontSize: 10,
     fontFamily: 'Mali_700Bold',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    marginTop: Platform.OS === 'android' ? -2 : 0, 
   },
 
   statsGrid: {
@@ -301,6 +378,11 @@ const styles = StyleSheet.create({
     width: '48%',
     padding: 16,
     borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   statTitle: {
     fontFamily: 'Mali_700Bold',
@@ -331,7 +413,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Mali_700Bold',
     fontSize: 18,
     color: theme.textDark,
-    marginBottom: 16,
   },
   sectionBadge: {
     backgroundColor: theme.badgeBg,
@@ -356,6 +437,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'space-between',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   actionInfo: {
     flexDirection: 'row',
@@ -366,7 +452,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.textExpiring,
   },
   actionName: {
     fontFamily: 'Mali_700Bold',
@@ -380,10 +465,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: theme.cardExpiring,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 99,
@@ -391,7 +472,6 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontFamily: 'Mali_700Bold',
     fontSize: 11,
-    color: theme.textExpiring,
   },
 
   emptyCard: {
@@ -400,6 +480,11 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   emptyText: {
     fontFamily: 'Mali_400Regular',
@@ -420,6 +505,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   quickBtnPrimary: {
     backgroundColor: theme.primary,
@@ -428,5 +518,61 @@ const styles = StyleSheet.create({
     fontFamily: 'Mali_700Bold',
     fontSize: 12,
     color: theme.textDark,
+  },
+
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  popupContent: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 110 : 90,
+    right: 20,
+    width: 260,
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  popupTitle: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 14,
+    color: theme.textDark,
+    marginBottom: 12,
+  },
+  popupItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  popupDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 8,
+  },
+  popupItemText: {
+    fontFamily: 'Mali_400Regular',
+    fontSize: 12,
+    color: theme.textDark,
+    flex: 1,
+  },
+  popupEmptyText: {
+    fontFamily: 'Mali_400Regular',
+    fontSize: 12,
+    color: theme.textLight,
+  },
+  popupMoreText: {
+    fontFamily: 'Mali_400Regular',
+    fontSize: 11,
+    color: theme.textLight,
+    marginTop: 4,
+    textAlign: 'center',
   },
 });

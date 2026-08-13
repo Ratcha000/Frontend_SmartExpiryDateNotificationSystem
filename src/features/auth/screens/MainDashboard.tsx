@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Platform, ActivityIndicator, TextInput, ScrollView, Modal } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard'; 
 import { useAuth } from '../../../context/AuthContext';
 import apiClient from '../../../api/client'; 
 import HomeScreen from './HomeScreen';
-
+import InventoryScreen from './InventoryScreen';
+import AddIngredientScreen from './AddIngredientScreen'; 
+import AlertsScreen from './AlertsScreen';
+import IngredientDetailScreen from './IngredientDetailScreen';
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
 
 const theme = {
   background: '#F5F3E9',
@@ -16,20 +21,12 @@ const theme = {
   textLight: '#8D867E',
   textDark: '#382512',
   danger: '#D9534F',
-  success: '#10B981', // เพิ่มสีเขียวสำหรับ Success
+  success: '#10B981', 
   inputBg: '#EBE7E0'
 };
 
-// ---------------- หน้า Home, Inventory, Alerts (โครงร่างเดิม) ----------------
 
-const InventoryScreen = () => (
-  <View style={styles.centerContainer}><Text style={styles.title}>Inventory</Text></View>
-);
-const AlertsScreen = () => (
-  <View style={styles.centerContainer}><Text style={styles.title}>Alerts</Text></View>
-);
 
-// ---------------- หน้า Team ----------------
 const TeamScreen = () => {
   const { user, logout } = useAuth();
   const isManager = user?.role === 'MANAGER';
@@ -40,7 +37,6 @@ const TeamScreen = () => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState('');
 
-  // 🔴 State สำหรับ Custom Modal อเนกประสงค์
   const [modalConfig, setModalConfig] = useState({
     visible: false,
     type: 'success' as 'success' | 'error' | 'confirm',
@@ -50,7 +46,6 @@ const TeamScreen = () => {
     onConfirm: null as (() => void) | null,
   });
 
-  // ฟังก์ชันตัวช่วยสำหรับเปิด/ปิด Modal
   const showModal = (type: 'success' | 'error' | 'confirm', title: string, message: string, onConfirm: (() => void) | null = null, confirmText = 'OK') => {
     setModalConfig({ visible: true, type, title, message, onConfirm, confirmText });
   };
@@ -89,7 +84,6 @@ const TeamScreen = () => {
     return name.substring(0, 2).toUpperCase();
   };
 
-  // 🔴 เปลี่ยน Alert เป็น showModal
   const handleCopyCode = async () => {
     if (restaurant?.inviteCode) {
       await Clipboard.setStringAsync(restaurant.inviteCode);
@@ -109,14 +103,22 @@ const TeamScreen = () => {
     }
   };
 
-  // 🔴 ฟังก์ชันลบสมาชิก (โยงกับ Modal Confirm)
-  const executeDelete = async (memberId: string) => {
+ const executeDelete = async (memberId: string) => {
     try {
       await apiClient.delete(`/restaurants/${restaurant.id}/members/${memberId}`);
       setMembers(members.filter(m => m.id !== memberId));
       showModal('success', 'Success', 'ลบสมาชิกเรียบร้อยแล้ว');
-    } catch (error) {
-      showModal('error', 'Error', 'ไม่สามารถลบสมาชิกได้');
+    } catch (error: any) {
+      console.log('Delete Error:', error?.response?.data);
+      
+      let errMsg = error?.response?.data?.message || 'ไม่สามารถลบสมาชิกได้'; 
+      
+      // 🔴 ดักจับ Error จาก Spring Boot กรณีหา Endpoint ไม่เจอ
+      if (errMsg.includes('No static resource') || error?.response?.status === 404) {
+        errMsg = 'API หลังบ้านยังไม่รองรับการลบสมาชิก (ยังไม่มี Endpoint นี้) หรือระบุ Path ไม่ตรงกันครับ';
+      }
+      
+      showModal('error', 'ข้อผิดพลาด', errMsg);
     }
   };
 
@@ -130,7 +132,6 @@ const TeamScreen = () => {
     );
   };
 
-  // 🔴 ฟังก์ชันยืนยันก่อน Log Out
   const handleLogout = () => {
     showModal(
       'confirm',
@@ -149,7 +150,6 @@ const TeamScreen = () => {
     );
   }
 
-  // ตัวแปรสำหรับคุมสีและไอคอนของ Modal แต่ละประเภท
   const isConfirm = modalConfig.type === 'confirm';
   const isError = modalConfig.type === 'error';
   const modalIconName = isConfirm ? 'alert-triangle' : isError ? 'x-circle' : 'check-circle';
@@ -186,11 +186,11 @@ const TeamScreen = () => {
           ) : (
             <View style={styles.restaurantNameRow}>
               <Text style={styles.pageSubtitle} numberOfLines={1}>{restaurant?.name}</Text>
-              {isManager && (
+              {isManager ? (
                 <TouchableOpacity onPress={() => setIsEditingName(true)} style={styles.editIcon}>
                   <Feather name="edit-2" size={14} color={theme.textLight} />
                 </TouchableOpacity>
-              )}
+              ) : null}
             </View>
           )}
         </View>
@@ -219,7 +219,8 @@ const TeamScreen = () => {
             </View>
           </View>
 
-          {isManager && restaurant?.inviteCode && (
+          {/* 🔴 แก้ไขจุดบั๊กของหน้า Team ที่ทำให้จอแดง */}
+          {isManager && restaurant?.inviteCode ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>TEAM INVITE CODE</Text>
               <View style={styles.inviteCard}>
@@ -232,7 +233,7 @@ const TeamScreen = () => {
                 </TouchableOpacity>
               </View>
             </View>
-          )}
+          ) : null}
 
           <View style={styles.section}>
             <View style={styles.memberHeader}>
@@ -254,14 +255,14 @@ const TeamScreen = () => {
                     </View>
                   </View>
                   
-                  {isManager && item.id !== user.id && (
+                  {isManager && item.id !== user.id ? (
                     <TouchableOpacity 
                       style={styles.deleteMemberBtn} 
                       onPress={() => handleRemoveMember(item.id, item.displayName)}
                     >
                       <Feather name="trash-2" size={18} color={theme.danger} />
                     </TouchableOpacity>
-                  )}
+                  ) : null}
                 </View>
               </View>
             ))}
@@ -269,12 +270,10 @@ const TeamScreen = () => {
         </>
       )}
 
-      {/* 🔴 เรียกใช้ handleLogout แทน */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutButtonText}>Log Out</Text>
       </TouchableOpacity>
 
-      {/* 🔴 Universal Custom Modal */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -288,7 +287,6 @@ const TeamScreen = () => {
             </View>
             <Text style={styles.modalTitle}>{modalConfig.title}</Text>
             
-            {/* เช็คเพื่อจัดรูปแบบข้อความเน้นตัวหนาให้เนียนๆ */}
             <Text style={styles.modalMessage}>
               {modalConfig.message.includes('คุณต้องการลบ') ? (
                 <>คุณต้องการลบ <Text style={{ fontFamily: 'Mali_700Bold', color: theme.textDark }}>{modalConfig.message.replace('คุณต้องการลบ ', '').replace(' ออกจากทีมใช่หรือไม่?', '')}</Text> ออกจากทีมใช่หรือไม่?</>
@@ -298,18 +296,16 @@ const TeamScreen = () => {
             </Text>
             
             <View style={styles.modalButtonGroup}>
-              {/* ปุ่ม Cancel (โชว์เฉพาะตอนเป็น confirm) */}
-              {isConfirm && (
+              {isConfirm ? (
                 <TouchableOpacity style={styles.modalButtonCancel} onPress={closeModal}>
                   <Text style={styles.modalButtonCancelText}>Cancel</Text>
                 </TouchableOpacity>
-              )}
+              ) : null}
               
-              {/* ปุ่ม Confirm / OK */}
               <TouchableOpacity 
                 style={[
                   styles.modalButtonConfirm, 
-                  !isConfirm && { backgroundColor: theme.primary } // เปลี่ยนสีปุ่มถ้าไม่ใช่ Confirm
+                  !isConfirm ? { backgroundColor: theme.primary } : null
                 ]} 
                 onPress={() => {
                   closeModal();
@@ -322,13 +318,11 @@ const TeamScreen = () => {
           </View>
         </View>
       </Modal>
-
     </ScrollView>
   );
 };
 
-// ---------------- Component หลัก (Bottom Tabs) ----------------
-export default function MainDashboard() {
+function MainTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -362,6 +356,16 @@ export default function MainDashboard() {
       <Tab.Screen name="Alerts" component={AlertsScreen} />
       <Tab.Screen name="Team" component={TeamScreen} />
     </Tab.Navigator>
+  );
+}
+
+export default function MainDashboard() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+      <Stack.Screen name="AddIngredient" component={AddIngredientScreen} />
+      <Stack.Screen name="IngredientDetail" component={IngredientDetailScreen} />
+    </Stack.Navigator>
   );
 }
 
@@ -403,8 +407,6 @@ const styles = StyleSheet.create({
   deleteMemberBtn: { padding: 8, backgroundColor: '#FEF2F2', borderRadius: 8 },
   logoutButton: { backgroundColor: theme.danger, padding: 16, borderRadius: 99, alignItems: 'center', marginTop: 10, marginBottom: 20 },
   logoutButtonText: { fontFamily: 'Mali_700Bold', color: '#FFF', fontSize: 16 },
-
-  // Styles สำหรับ Custom Modal (ปรับโครงสร้างใหม่ให้ใช้ได้ทุกประเภท)
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(74, 54, 35, 0.4)', 
@@ -468,7 +470,7 @@ const styles = StyleSheet.create({
   modalButtonConfirm: {
     flex: 1,
     height: 52,
-    backgroundColor: theme.danger, // สีเริ่มต้น (สีแดง) 
+    backgroundColor: theme.danger, 
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',

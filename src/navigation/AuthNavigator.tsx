@@ -1,9 +1,11 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
-import LogInScreen from '../features/auth/screens/LogInScreen'; // หรือชื่อไฟล์ที่คุณเอาโค้ดใหม่ไปวางทับ
+import LogInScreen from '../features/auth/screens/LogInScreen';
+import AddIngredientScreen from '../features/auth/screens/AddIngredientScreen'; // ✅ แก้ไข: ลบ import ที่ซ้ำซ้อนออกแล้ว
 
 export type AuthStackParamList = {
-  LogIn: undefined; // เปลี่ยนชื่อ Route ให้สอดคล้อง
+  LogIn: undefined;
+  AddIngredient: undefined; // 🔴 เพิ่มบรรทัดนี้ เพื่อบอก TypeScript ว่ามีหน้าใหม่ชื่อนี้แล้ว
 };
 
 const Stack = createStackNavigator<AuthStackParamList>();
@@ -11,7 +13,7 @@ const Stack = createStackNavigator<AuthStackParamList>();
 const AuthNavigator = () => {
   return (
     <Stack.Navigator
-      initialRouteName="LogIn" // ตั้งค่าให้เปิดมาเจอหน้าแรกนี้ทันที
+      initialRouteName="LogIn"
       screenOptions={{
         headerShown: false,
         cardStyle: { backgroundColor: 'transparent' },
@@ -20,6 +22,11 @@ const AuthNavigator = () => {
       <Stack.Screen
         name="LogIn"
         component={LogInScreen}
+      />
+      <Stack.Screen
+        name="AddIngredient"
+        component={AddIngredientScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
