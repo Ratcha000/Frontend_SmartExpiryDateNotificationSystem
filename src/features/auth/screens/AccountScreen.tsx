@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,11 +10,13 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { useFonts, Mali_400Regular, Mali_700Bold } from '@expo-google-fonts/mali';
+import { Feather } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store'; // 🔴 นำเข้า SecureStore เพื่อใช้จำประวัติการมีร้าน
 import { useAuth } from '../../../context/AuthContext';
 
-// 🔴 นำเข้า Service ที่เราจัดระเบียบไว้ (ปรับ path ให้ตรงกับโฟลเดอร์ api ของคุณนะครับ)
 import { restaurantService } from '../../../api/restaurants';
 import { authApi } from '../../../api/auth';
 
@@ -38,6 +40,51 @@ export default function AccountScreen() {
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const [modalConfig, setModalConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info' as 'info' | 'error',
+  });
+
+  const showModal = (title: string, message: string, type: 'info' | 'error' = 'info') => {
+    setModalConfig({ visible: true, title, message, type });
+  };
+
+  const closeModal = () => setModalConfig(prev => ({ ...prev, visible: false }));
+
+  // 🔴 ลอจิกใหม่: เช็คประวัติการมีร้าน เพื่อแยก "เด็กใหม่" กับ "คนโดนเตะ" ออกจากกัน
+  useEffect(() => {
+    const checkKickedStatus = async () => {
+      if (!user) return;
+
+      try {
+        const storageKey = `last_restaurant_of_${user.id}`;
+        const lastRestId = await SecureStore.getItemAsync(storageKey);
+
+        if (user.restaurantId) {
+          // ถ้าปัจจุบันมีร้าน ให้จดจำเอาไว้ในเครื่อง
+          await SecureStore.setItemAsync(storageKey, user.restaurantId.toString());
+        } else {
+          // ถ้าปัจจุบันไม่มีร้าน + แต่ในอดีตเคยมี = โดนเตะแน่นอน
+          if (lastRestId) {
+            showModal(
+              'แจ้งเตือนสถานะ', 
+              'คุณถูกนำออกจากทีม หรือร้านค้าถูกยุบไปแล้ว กรุณากรอกรหัสเพื่อเข้าร่วมทีมใหม่อีกครั้งครับ',
+              'error'
+            );
+            // ลบความจำทิ้ง ป็อปอัพจะได้ไม่เด้งซ้ำๆ เวลาผู้ใช้กด Refresh หรือเปิดหน้านี้ใหม่
+            await SecureStore.deleteItemAsync(storageKey);
+          }
+        }
+      } catch (error) {
+        console.log('SecureStore check error:', error);
+      }
+    };
+
+    checkKickedStatus();
+  }, [user]);
+
   const handleLogout = () => {
     Alert.alert('ออกจากระบบ', 'คุณต้องการออกจากระบบใช่หรือไม่?', [
       { text: 'ยกเลิก', style: 'cancel' },
@@ -49,18 +96,12 @@ export default function AccountScreen() {
     if (!restaurantName) return;
     setLoading(true);
     try {
-      // 1. เรียกใช้ Service สร้างร้าน
       await restaurantService.createRestaurant(restaurantName);
-      
-      // 2. เรียกใช้ Service ดึงข้อมูล User ล่าสุด
       const currentUser = await authApi.getCurrentUser();
-      
-      // 3. อัปเดตลง Context ระบบจะพาเด้งเข้า Dashboard อัตโนมัติ
       if (setUser) setUser(currentUser);
-      
     } catch (err: any) {
       console.log('>>> [DEBUG] Error สร้างร้าน:', err?.response?.data || err.message);
-      Alert.alert('ข้อผิดพลาด', err?.response?.data?.message || 'เกิดข้อผิดพลาดในการสร้างร้าน');
+      showModal('ข้อผิดพลาด', err?.response?.data?.message || 'เกิดข้อผิดพลาดในการสร้างร้าน', 'error');
       setLoading(false);
     }
   };
@@ -69,18 +110,12 @@ export default function AccountScreen() {
     if (!inviteCode) return;
     setLoading(true);
     try {
-      // 1. เรียกใช้ Service เข้าร่วมร้าน
       await restaurantService.joinRestaurant(inviteCode);
-      
-      // 2. เรียกใช้ Service ดึงข้อมูล User ล่าสุด
       const currentUser = await authApi.getCurrentUser();
-      
-      // 3. อัปเดตลง Context
       if (setUser) setUser(currentUser);
-      
     } catch (err: any) {
       console.log('>>> [DEBUG] Error เข้าร่วมร้าน:', err?.response?.data || err.message);
-      Alert.alert('ข้อผิดพลาด', err?.response?.data?.message || 'รหัสเชิญไม่ถูกต้อง');
+      showModal('ข้อผิดพลาด', err?.response?.data?.message || 'รหัสเชิญไม่ถูกต้อง หรือทีมเต็มแล้ว', 'error');
       setLoading(false);
     }
   };
@@ -122,15 +157,15 @@ export default function AccountScreen() {
                   <TouchableOpacity style={styles.optionCard} onPress={() => setMode('CREATE')}>
                     <Text style={styles.optionIcon}>🏠</Text>
                     <Text style={styles.optionTitle}>Create a New Restaurant</Text>
-                    <Text style={styles.optionDesc}>สร้างร้านอาหารของคุณ!</Text>
+                    <Text style={styles.optionDesc}>สร้างร้านอาหารของคุณเพื่อเริ่มต้นจัดการสต็อก!</Text>
                   </TouchableOpacity>
                 )}
 
-                {user?.role === 'EMPLOYEE' && (
+                {(user?.role === 'EMPLOYEE' || user?.role === 'MANAGER') && (
                   <TouchableOpacity style={styles.optionCard} onPress={() => setMode('JOIN')}>
                     <Text style={styles.optionIcon}>🤝</Text>
                     <Text style={styles.optionTitle}>Join an Existing Team</Text>
-                    <Text style={styles.optionDesc}>I have an invite code from my restaurant manager.</Text>
+                    <Text style={styles.optionDesc}>เข้าร่วมทีมที่มีอยู่แล้วด้วยรหัสเชิญ (Invite Code)</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -186,6 +221,36 @@ export default function AccountScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalConfig.visible}
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={[styles.modalIconBg, { backgroundColor: modalConfig.type === 'error' ? '#FEF2F2' : '#FFF4E5' }]}>
+              <Feather 
+                name={modalConfig.type === 'error' ? "alert-triangle" : "info"} 
+                size={32} 
+                color={modalConfig.type === 'error' ? theme.danger : theme.primary} 
+              />
+            </View>
+            <Text style={styles.modalTitle}>{modalConfig.title}</Text>
+            <Text style={styles.modalMessage}>{modalConfig.message}</Text>
+            <View style={styles.modalButtonGroup}>
+              <TouchableOpacity 
+                style={[styles.modalButtonConfirm, { backgroundColor: theme.primary }]} 
+                onPress={closeModal}
+              >
+                <Text style={styles.modalButtonConfirmText}>รับทราบ</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -228,4 +293,63 @@ const styles = StyleSheet.create({
   
   submitButton: { backgroundColor: theme.primary, height: 56, borderRadius: 99, justifyContent: 'center', alignItems: 'center', shadowColor: theme.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   submitButtonText: { fontFamily: 'Mali_700Bold', color: '#FFFFFF', fontSize: 16 },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(74, 54, 35, 0.4)', 
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContainer: {
+    backgroundColor: theme.card,
+    width: '100%',
+    borderRadius: 32,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  modalIconBg: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 22,
+    color: theme.textDark,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontFamily: 'Mali_400Regular',
+    fontSize: 14,
+    color: theme.textLight,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  modalButtonGroup: {
+    flexDirection: 'row',
+    width: '100%',
+  },
+  modalButtonConfirm: {
+    flex: 1,
+    height: 52,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalButtonConfirmText: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 15,
+    color: '#FFF',
+  },
 });

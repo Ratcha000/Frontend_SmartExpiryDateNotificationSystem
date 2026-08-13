@@ -1,6 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import * as SecureStore from 'expo-secure-store';
-// 🔴 1. แก้ไข Import โดยเพิ่ม setGlobalToken เข้ามา
 import apiClient, { setGlobalToken } from '../api/client'; 
 import { User } from '../types';
 
@@ -34,13 +33,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (storedToken) {
             token = storedToken;
           }
-        } catch (e) {
+        } catch (e: any) { // 🔴 เพิ่ม : any เพื่อแก้ TypeScript Error
           console.warn('SecureStore not available, using fallback storage');
           token = tokenFallback;
         }
 
         if (token) {
-          // 🔴 2. เติมบรรทัดนี้ เพื่อฝัง Token ลงไปใน API Client
+          // ฝัง Token ลงไปใน API Client
           setGlobalToken(token); 
           
           const response = await apiClient.get<User>('/auth/me');
@@ -49,15 +48,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setIsAuthenticated(false);
         }
-      } catch (error) {
-        console.error('Authentication check failed:', error);
+      } catch (error: any) { // 🔴 เพิ่ม : any เพื่อให้เรียกใช้ error?.message ได้โดยไม่ติดขีดแดง
+        console.log('Authentication check failed:', error?.message);
         try {
           // ใช้ deleteItemAsync แทน Keychain
           await SecureStore.deleteItemAsync('token');
-        } catch (_) {}
+        } catch (e: any) {}
+        
         tokenFallback = '';
-        // 🔴 3. ล้างค่า Token เผื่อกรณีดึงข้อมูลพลาด
-        setGlobalToken(null); 
+        // ล้างค่า Token เผื่อกรณีดึงข้อมูลพลาด
+        setGlobalToken(''); // ส่งเป็น string ว่างแทน null เพื่อป้องกันปัญหา Type ของบาง API Client
         setIsAuthenticated(false);
       } finally {
         setIsLoading(false);
@@ -68,13 +68,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (token: string, userData: User) => {
-    // 🔴 4. อัปเดต Token ตอน Login
+    // อัปเดต Token ตอน Login
     setGlobalToken(token); 
     
     try {
       // ใช้ setItemAsync แทน Keychain
       await SecureStore.setItemAsync('token', token);
-    } catch (e) {
+    } catch (e: any) {
       console.warn('SecureStore not available to save, using fallback');
     }
     tokenFallback = token;
@@ -83,19 +83,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    // 🔴 5. ล้างค่า Token ตอน Logout
-    setGlobalToken(null); 
+    // ล้างค่า Token ตอน Logout
+    setGlobalToken(''); 
     
     try {
       await apiClient.post('/auth/logout');
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Backend logout failed, clearing local session anyway');
     }
 
     try {
       // ใช้ deleteItemAsync แทน Keychain
       await SecureStore.deleteItemAsync('token');
-    } catch (e) {
+    } catch (e: any) {
       console.warn('SecureStore not available to reset');
     }
     tokenFallback = '';
