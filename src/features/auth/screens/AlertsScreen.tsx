@@ -1,13 +1,14 @@
 import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
   Platform,
   ActivityIndicator,
   RefreshControl,
+  Modal
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,53 +18,51 @@ import apiClient from '../../../api/client';
 const theme = {
   background: '#F9F8F4',
   card: '#FFFFFF',
-  textDark: '#24211D',
+  primary: '#24211D',
   textLight: '#A39C93',
+  textDark: '#24211D',
+  inputBg: '#F3F4F6', 
+  expired: '#DC2626',
+  expiredBg: '#FEE2E2',
+  nearExpiry: '#D97706',
+  nearExpiryBg: '#FEF3C7',
+  success: '#10B981',
+  successBg: '#E6F4EA',
   border: '#E8E6E1',
-  
-  // สีประจำแต่ละหมวดหมู่ตามดีไซน์
-  critical: '#DC2626',   // Expired
-  urgent: '#D97706',     // Expiring Today
-  warning: '#D4A373',    // Within 3 days (สีทอง/ส้มอ่อน)
-  stock: '#417B5A',      // Low Stock (สีเขียวเข้ม)
 };
 
 export default function AlertsScreen({ navigation }: any) {
   const { user } = useAuth();
+  const isManager = user?.role === 'MANAGER';
   
+  const [expiredItems, setExpiredItems] = useState<any[]>([]);
+  const [expiringItems, setExpiringItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
-  // สเตทแยกแต่ละกลุ่ม
-  const [expiredItems, setExpiredItems] = useState<any[]>([]);
-  const [todayItems, setTodayItems] = useState<any[]>([]);
-  const [soonItems, setSoonItems] = useState<any[]>([]);
-  const [lowStockItems, setLowStockItems] = useState<any[]>([]);
+
+  const [modalConfig, setModalConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'alert' as 'alert' | 'confirm',
+    onConfirm: null as (() => void) | null,
+  });
+  const [itemToDelete, setItemToDelete] = useState<any>(null);
+
+  const showModal = (title: string, message: string, type: 'alert' | 'confirm' = 'alert', onConfirm: (() => void) | null = null) => {
+    setModalConfig({ visible: true, title, message, type, onConfirm });
+  };
+
+  const closeModal = () => setModalConfig(prev => ({ ...prev, visible: false }));
 
   const fetchAlerts = async () => {
-    if (!user?.restaurantId) {
-      setIsLoading(false);
-      setRefreshing(false);
-      return;
-    }
-
+    if (!user?.restaurantId) return;
     try {
       const res = await apiClient.get(`/ingredients?restaurantId=${user.restaurantId}`);
       const activeItems = res.data.filter((item: any) => item.status !== 'DELETED');
       
-      // จัดกลุ่มข้อมูล
-      const expired = activeItems.filter((i: any) => i.expired || i.daysLeft < 0);
-      const today = activeItems.filter((i: any) => !i.expired && i.daysLeft === 0);
-      const soon = activeItems.filter((i: any) => !i.expired && i.daysLeft > 0 && i.daysLeft <= 3);
-      
-      // Stock Alert: สินค้าน้อยกว่า 20% ของที่เคยมี
-      const stock = activeItems.filter((i: any) => i.quantity <= (i.initialQuantity * 0.2) && !i.expired && i.daysLeft !== 0);
-
-      setExpiredItems(expired);
-      setTodayItems(today);
-      setSoonItems(soon);
-      setLowStockItems(stock);
-
+      setExpiredItems(activeItems.filter((item: any) => item.expired || item.status === 'EXPIRED'));
+      setExpiringItems(activeItems.filter((item: any) => item.expiring && !item.expired && item.status !== 'EXPIRED'));
     } catch (error) {
       console.log('Error fetching alerts:', error);
     } finally {
@@ -83,238 +82,199 @@ export default function AlertsScreen({ navigation }: any) {
     fetchAlerts();
   }, []);
 
-  const totalUnread = expiredItems.length + todayItems.length + soonItems.length + lowStockItems.length;
+  const handleDeletePress = (item: any) => {
+    if (!isManager) {
+      showModal('ปฏิเสธการเข้าถึง', 'ขออภัย เฉพาะ Manager เท่านั้นที่สามารถลบข้อมูลวัตถุดิบได้ครับ', 'alert');
+      return;
+    }
+    setItemToDelete(item);
+    showModal(
+      'ยืนยันการลบข้อมูล', 
+      `คุณต้องการลบ "${item.name}" ออกจากคลังสินค้าใช่หรือไม่?`, 
+      'confirm', 
+      executeDelete
+    );
+  };
+
+  const executeDelete = async () => {
+    if (!itemToDelete) return;
+    setIsLoading(true);
+    try {
+      await apiClient.delete(`/ingredients/${itemToDelete.id}`);
+      closeModal();
+      setItemToDelete(null);
+      fetchAlerts(); 
+    } catch (error: any) {
+      showModal('ข้อผิดพลาด', 'ไม่สามารถลบวัตถุดิบได้ เกิดข้อผิดพลาดจากระบบ', 'alert');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (isLoading && !refreshing) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={theme.textDark} />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
 
-  // Component ตัวแทนสร้างการ์ดแต่ละใบ
-  const AlertCard = ({ item, type, dotColor, timeText, subtitleFormat }: any) => (
-    <View style={styles.card}>
-      <View style={styles.cardLeft}>
-        <View style={[styles.dot, { backgroundColor: dotColor }]} />
-        <View style={styles.cardInfo}>
-          <Text style={styles.itemName}>{item.name}</Text>
-          <Text style={styles.itemDesc}>{subtitleFormat(item)}</Text>
-        </View>
-      </View>
-      <Text style={styles.timeText}>{timeText}</Text>
-    </View>
-  );
+  const totalNotifications = expiredItems.length + expiringItems.length;
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.pageTitle}>Notifications</Text>
+          <Text style={styles.pageSubtitle}>
+            {totalNotifications} รายการที่ยังไม่ได้อ่าน
+          </Text>
+        </View>
+        <TouchableOpacity>
+          <Text style={styles.markReadText}>อ่านทั้งหมด</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView 
-        contentContainerStyle={styles.scrollContent} 
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} />}
       >
         
-        {/* --- Header --- */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.pageTitle}>Alerts</Text>
-            <Text style={styles.pageSubtitle}>{totalUnread} unread notification{totalUnread > 1 ? 's' : ''}</Text>
-          </View>
-          <TouchableOpacity onPress={() => {/* สำหรับต่อยอดฟังก์ชันอ่านทั้งหมด */}}>
-            <Text style={styles.markReadText}>Mark all read</Text>
-          </TouchableOpacity>
-        </View>
-
-        {totalUnread === 0 && (
+        {totalNotifications === 0 ? (
           <View style={styles.emptyContainer}>
-            <Feather name="bell-off" size={48} color={theme.border} style={{ marginBottom: 16 }} />
-            <Text style={styles.emptyText}>All caught up!</Text>
-            <Text style={styles.emptySubText}>You have no pending alerts right now.</Text>
+            <Feather name="bell-off" size={48} color={theme.textLight} style={{ marginBottom: 16 }} />
+            <Text style={styles.emptyText}>ไม่มีการแจ้งเตือนในขณะนี้</Text>
           </View>
-        )}
+        ) : (
+          <>
+            {/* --- หมวดหมู่: หมดอายุ (EXPIRED) --- */}
+            {expiredItems.length > 0 && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: theme.expired }]}>วิกฤต — หมดอายุแล้ว</Text>
+                {expiredItems.map(item => (
+                  <View key={`exp-${item.id}`} style={styles.card}>
+                    <View style={styles.cardInfo}>
+                      <View style={[styles.dot, { backgroundColor: theme.expired }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.itemName}>{item.name}</Text>
+                        <Text style={styles.itemDesc}>
+                          หมดอายุไปแล้ว {Math.abs(item.daysLeft)} วัน • เหลือ {item.quantity} {item.unit}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, { backgroundColor: theme.expiredBg }]}
+                      onPress={() => handleDeletePress(item)}
+                    >
+                      <Feather name="trash-2" size={18} color={theme.expired} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
 
-        {/* --- CRITICAL: EXPIRED --- */}
-        {expiredItems.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.critical }]}>CRITICAL — EXPIRED</Text>
-            {expiredItems.map(item => (
-              <AlertCard 
-                key={`exp-${item.id}`}
-                item={item}
-                dotColor={theme.critical}
-                timeText="Just now"
-                subtitleFormat={(i: any) => `Expired ${Math.abs(i.daysLeft)} day${Math.abs(i.daysLeft) > 1 ? 's' : ''} ago • ${i.quantity} ${i.unit} remaining`}
-              />
-            ))}
-          </View>
+            {/* --- หมวดหมู่: ใกล้หมดอายุ (NEAR EXPIRY) --- */}
+            {expiringItems.length > 0 && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: theme.nearExpiry }]}>คำเตือน — ใกล้หมดอายุ</Text>
+                {expiringItems.map(item => (
+                  <View key={`near-${item.id}`} style={styles.card}>
+                    <View style={styles.cardInfo}>
+                      <View style={[styles.dot, { backgroundColor: theme.nearExpiry }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.itemName}>{item.name}</Text>
+                        <Text style={styles.itemDesc}>
+                          จะหมดอายุในอีก {item.daysLeft} วัน • เหลือ {item.quantity} {item.unit}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, { backgroundColor: theme.successBg }]}
+                      onPress={() => navigation.navigate('MenuSuggestions')}
+                    >
+                      <Feather name="zap" size={18} color={theme.success} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
         )}
-
-        {/* --- URGENT: EXPIRING TODAY --- */}
-        {todayItems.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.urgent }]}>URGENT — EXPIRING TODAY</Text>
-            {todayItems.map(item => (
-              <AlertCard 
-                key={`tdy-${item.id}`}
-                item={item}
-                dotColor={theme.urgent}
-                timeText="Just now"
-                subtitleFormat={(i: any) => `Expires today • ${i.quantity} ${i.unit} remaining`}
-              />
-            ))}
-          </View>
-        )}
-
-        {/* --- WARNING: WITHIN 3 DAYS --- */}
-        {soonItems.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#6A7280' }]}>WARNING — WITHIN 3 DAYS</Text>
-            {soonItems.map(item => (
-              <AlertCard 
-                key={`soon-${item.id}`}
-                item={item}
-                dotColor={theme.warning}
-                timeText="1h ago"
-                subtitleFormat={(i: any) => `Expires in ${i.daysLeft} days • ${i.quantity} ${i.unit} remaining`}
-              />
-            ))}
-          </View>
-        )}
-
-        {/* --- STOCK ALERT --- */}
-        {lowStockItems.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#6A7280' }]}>STOCK ALERT</Text>
-            {lowStockItems.map(item => (
-              <AlertCard 
-                key={`stk-${item.id}`}
-                item={item}
-                dotColor={theme.stock}
-                timeText="Today"
-                subtitleFormat={(i: any) => `${i.quantity} ${i.unit} • below par of ${i.initialQuantity * 0.2} ${i.unit}`}
-              />
-            ))}
-          </View>
-        )}
-
-        <View style={{ height: 40 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Modal */}
+      <Modal animationType="fade" transparent={true} visible={modalConfig.visible} onRequestClose={closeModal}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={[styles.modalIconBg, { backgroundColor: modalConfig.type === 'alert' ? theme.expiredBg : theme.nearExpiryBg }]}>
+              <Feather name="alert-triangle" size={32} color={modalConfig.type === 'alert' ? theme.expired : theme.nearExpiry} />
+            </View>
+            <Text style={styles.modalTitle}>{modalConfig.title}</Text>
+            <Text style={styles.modalMessage}>{modalConfig.message}</Text>
+            
+            <View style={styles.modalButtonGroup}>
+              {modalConfig.type === 'confirm' && (
+                <TouchableOpacity style={styles.modalButtonCancel} onPress={closeModal}>
+                  <Text style={styles.modalButtonCancelText}>ยกเลิก</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity 
+                style={[styles.modalButtonConfirm, { backgroundColor: modalConfig.type === 'alert' ? theme.primary : theme.expired }]} 
+                onPress={() => {
+                  if (modalConfig.type === 'confirm' && modalConfig.onConfirm) {
+                    modalConfig.onConfirm();
+                  } else {
+                    closeModal();
+                  }
+                }}
+              >
+                <Text style={styles.modalButtonConfirmText}>{modalConfig.type === 'confirm' ? 'ลบข้อมูล' : 'ตกลง'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.background,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: theme.background,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: 40,
-  },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background },
+  container: { flex: 1, backgroundColor: theme.background },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: 20 },
+  pageTitle: { fontFamily: 'Mali_700Bold', fontSize: 32, color: theme.textDark, marginBottom: 4 },
+  pageSubtitle: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight },
+  markReadText: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight, marginTop: 12 },
   
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 32,
-  },
-  pageTitle: {
-    fontFamily: 'Mali_700Bold',
-    fontSize: 28,
-    color: theme.textDark,
-  },
-  pageSubtitle: {
-    fontFamily: 'Mali_400Regular',
-    fontSize: 14,
-    color: theme.textLight,
-  },
-  markReadText: {
-    fontFamily: 'Mali_400Regular',
-    fontSize: 14,
-    color: '#6A7280',
-    marginTop: 8,
-  },
-
-  emptyContainer: {
-    marginTop: 80,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontFamily: 'Mali_700Bold',
-    fontSize: 20,
-    color: theme.textDark,
-    marginBottom: 8,
-  },
-  emptySubText: {
-    fontFamily: 'Mali_400Regular',
-    fontSize: 14,
-    color: theme.textLight,
-  },
-
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontFamily: 'Mali_700Bold',
-    fontSize: 11,
-    letterSpacing: 1,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
+  scrollContent: { paddingHorizontal: 20 },
   
-  card: {
-    flexDirection: 'row',
-    backgroundColor: theme.card,
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cardLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    flex: 1,
-    paddingRight: 10,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 6,
-    marginRight: 12,
-  },
-  cardInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontFamily: 'Mali_700Bold',
-    fontSize: 16,
-    color: theme.textDark,
-    marginBottom: 2,
-  },
-  itemDesc: {
-    fontFamily: 'Mali_400Regular',
-    fontSize: 13,
-    color: '#6A7280',
-  },
-  timeText: {
-    fontFamily: 'Mali_400Regular',
-    fontSize: 12,
-    color: theme.textLight,
-  },
+  emptyContainer: { alignItems: 'center', marginTop: 80 },
+  emptyText: { fontFamily: 'Mali_700Bold', fontSize: 16, color: theme.textLight },
+  
+  section: { marginBottom: 32 },
+  sectionTitle: { fontFamily: 'Mali_700Bold', fontSize: 11, letterSpacing: 1.5, marginBottom: 12, marginLeft: 4 },
+  
+  card: { backgroundColor: theme.card, borderRadius: 20, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
+  cardInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  dot: { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
+  itemName: { fontFamily: 'Mali_700Bold', fontSize: 16, color: theme.textDark, marginBottom: 4 },
+  itemDesc: { fontFamily: 'Mali_400Regular', fontSize: 13, color: theme.textLight },
+  
+  actionBtn: { width: 44, height: 44, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginLeft: 12 },
+  
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(74, 54, 35, 0.4)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalContainer: { backgroundColor: theme.card, width: '100%', borderRadius: 32, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 15 },
+  modalIconBg: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  modalTitle: { fontFamily: 'Mali_700Bold', fontSize: 22, color: theme.textDark, marginBottom: 8, textAlign: 'center' },
+  modalMessage: { fontFamily: 'Mali_400Regular', fontSize: 15, color: theme.textLight, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
+  modalButtonGroup: { flexDirection: 'row', width: '100%' },
+  modalButtonCancel: { flex: 1, height: 52, backgroundColor: theme.inputBg, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: 12, borderWidth: 1, borderColor: theme.border },
+  modalButtonCancelText: { fontFamily: 'Mali_700Bold', fontSize: 15, color: theme.textLight },
+  modalButtonConfirm: { flex: 1, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  modalButtonConfirmText: { fontFamily: 'Mali_700Bold', fontSize: 15, color: '#FFF' },
 });

@@ -39,7 +39,8 @@ export default function InventoryScreen({ navigation }: any) {
   const { user, logout } = useAuth();
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('All');
+  // 🔴 แก้ไขค่าเริ่มต้นให้ตรงกับปุ่มภาษาไทย
+  const [activeFilter, setActiveFilter] = useState('ทั้งหมด');
   
   const [inventory, setInventory] = useState<any[]>([]);
   const [filteredData, setFilteredData] = useState<any[]>([]);
@@ -55,7 +56,7 @@ export default function InventoryScreen({ navigation }: any) {
     onConfirm: null as (() => void) | null,
   });
 
-  // 🔴 State สำหรับ Modal แก้ไขจำนวนวัตถุดิบ
+  // State สำหรับ Modal แก้ไขจำนวนวัตถุดิบ
   const [editingItem, setEditingItem] = useState<any>(null);
   const [editQuantity, setEditQuantity] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -71,10 +72,10 @@ export default function InventoryScreen({ navigation }: any) {
   const lowStockCount = inventory.filter(item => item.quantity <= (item.initialQuantity * 0.20) && item.status !== 'DELETED').length;
 
   const filters = [
-    { label: 'All', count: null },
-    { label: 'Expiring', count: expiringCount },
-    { label: 'Expired', count: expiredCount },
-    { label: 'Low Stock', count: lowStockCount },
+    { label: 'ทั้งหมด', count: null },
+    { label: 'กำลังจะหมดอายุ', count: expiringCount },
+    { label: 'หมดอายุ', count: expiredCount },
+    { label: 'เหลือน้อย', count: lowStockCount },
   ];
 
   const fetchInventory = async () => {
@@ -116,11 +117,12 @@ export default function InventoryScreen({ navigation }: any) {
   useEffect(() => {
     let result = inventory;
 
-    if (activeFilter === 'Expiring') {
+    // 🔴 เปลี่ยนคำเงื่อนไขการกรองให้ตรงกับปุ่มภาษาไทย
+    if (activeFilter === 'กำลังจะหมดอายุ') {
       result = result.filter(item => item.expiring);
-    } else if (activeFilter === 'Expired') {
+    } else if (activeFilter === 'หมดอายุ') {
       result = result.filter(item => item.expired || item.status === 'EXPIRED');
-    } else if (activeFilter === 'Low Stock') {
+    } else if (activeFilter === 'เหลือน้อย') {
       result = result.filter(item => item.quantity <= (item.initialQuantity * 0.20));
     }
 
@@ -140,7 +142,6 @@ export default function InventoryScreen({ navigation }: any) {
     fetchInventory();
   }, []);
 
-  // 🔴 ฟังก์ชันส่งคำสั่งอัปเดตข้อมูลไปที่ API
   const handleUpdateQuantity = async () => {
     if (!editingItem) return;
     
@@ -152,14 +153,13 @@ export default function InventoryScreen({ navigation }: any) {
 
     setIsUpdating(true);
     try {
-      // ใช้คำสั่ง PUT เพื่ออัปเดตข้อมูล 
       await apiClient.put(`/ingredients/${editingItem.id}`, {
         ...editingItem,
         quantity: newQty
       });
       
       setEditingItem(null);
-      fetchInventory(); // ดึงข้อมูลใหม่หลังอัปเดตเสร็จ
+      fetchInventory(); 
     } catch (error: any) {
       console.log('Update Error:', error?.message);
       showModal('ข้อผิดพลาด', 'ไม่สามารถอัปเดตข้อมูลได้ กรุณาลองใหม่อีกครั้ง หรือเช็ค API หลังบ้านครับ');
@@ -253,7 +253,6 @@ export default function InventoryScreen({ navigation }: any) {
                   style={styles.card} 
                   activeOpacity={0.7}
                   onPress={() => {
-                    // 🔴 กดปุ๊บ เปิด Modal พร้อมยัดค่าปัจจุบันลงช่องกรอก
                     navigation.navigate('IngredientDetail', { item: item });
                   }}
                 >
@@ -312,7 +311,6 @@ export default function InventoryScreen({ navigation }: any) {
         <Feather name="plus" size={32} color="#FFF" />
       </TouchableOpacity>
 
-      {/* Modal แจ้งเตือนทั่วไป */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -344,7 +342,6 @@ export default function InventoryScreen({ navigation }: any) {
         </View>
       </Modal>
 
-      {/* 🔴 Modal สำหรับแก้ไขจำนวน (Edit Quantity) */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -694,7 +691,6 @@ const styles = StyleSheet.create({
     color: theme.textLight,
   },
 
-  // สไตล์เฉพาะสำหรับกล่องกรอกแก้ไขจำนวน
   editInputWrapper: {
     width: '100%',
     marginBottom: 24,
