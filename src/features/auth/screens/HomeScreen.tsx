@@ -22,15 +22,12 @@ const theme = {
   primary: '#24211D',
   textLight: '#A39C93',
   textDark: '#24211D',
-  
   cardExpiring: '#FFF3E3',
   cardExpired: '#FCE8E8',
   cardLowStock: '#F0F4FC',
-  
   textExpiring: '#D97706',
   textExpired: '#DC2626',
   textLowStock: '#2563EB',
-  
   badgeBg: '#F3E8E8',
   badgeText: '#D9534F',
   border: '#E8E6E1',
@@ -58,7 +55,6 @@ export default function HomeScreen({ navigation }: any) {
   const [showNotificationPopup, setShowNotificationPopup] = useState(false);
   const [hasReadNotifications, setHasReadNotifications] = useState(false);
   
-  // 🔴 ใช้ useRef เพื่อจดจำจำนวนล่าสุดแบบไม่ถูกรีเซ็ตเวลาสลับหน้า
   const prevActionCount = useRef(0); 
 
   const fetchHomeData = async () => {
@@ -86,7 +82,6 @@ export default function HomeScreen({ navigation }: any) {
 
         const newActionItems = [...expiring, ...expired];
         
-        // 🔴 เช็คจาก prevActionCount.current จะแม่นยำกว่า
         if (newActionItems.length > prevActionCount.current) {
           setHasReadNotifications(false);
         }
@@ -124,6 +119,8 @@ export default function HomeScreen({ navigation }: any) {
     );
   }
 
+  const expiringItemsOnly = actionItems.filter(i => i.expiring);
+
   return (
     <View style={styles.container}>
       <ScrollView 
@@ -131,60 +128,64 @@ export default function HomeScreen({ navigation }: any) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} />}
       >
         
+        {/* --- ส่วน Header ที่ปรับใหม่ --- */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.dateText}>{today}</Text>
-            <Text style={styles.greetingText}>Good morning, {displayName}</Text>
+          {/* บรรทัดบน: วันที่ และ คำทักทาย */}
+          <Text style={styles.dateText}>{today}</Text>
+          <Text style={styles.greetingText}>Good morning, {displayName}</Text>
+          
+          {/* บรรทัดล่าง: ชื่อร้าน และ ปุ่มกระดิ่งแจ้งเตือน ให้อยู่ระดับเดียวกัน */}
+          <View style={styles.locationAndNotificationRow}>
             <View style={styles.locationRow}>
-              <Feather name="map-pin" size={12} color={theme.danger} />
+              <Feather name="map-pin" size={14} color={theme.danger} />
               <Text style={styles.restaurantSubtext}>{restaurantData?.name || 'No Workspace'}</Text>
             </View>
+            
+            <TouchableOpacity 
+              style={styles.notificationBtn}
+              onPress={() => {
+                setShowNotificationPopup(true);
+                setHasReadNotifications(true);
+              }}
+            >
+              <Feather name="bell" size={20} color={theme.textDark} />
+              {actionItems.length > 0 && !hasReadNotifications ? (
+                <View style={styles.badgeContainer}>
+                  <Text style={styles.badgeNumber}>{actionItems.length}</Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
           </View>
-          
-          <TouchableOpacity 
-            style={styles.notificationBtn}
-            onPress={() => {
-              setShowNotificationPopup(true);
-              setHasReadNotifications(true);
-            }}
-          >
-            <Feather name="bell" size={24} color={theme.textDark} />
-            {actionItems.length > 0 && !hasReadNotifications && (
-              <View style={styles.badgeContainer}>
-                <Text style={styles.badgeNumber}>{actionItems.length}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
         </View>
 
         <View style={styles.statsGrid}>
           <View style={[styles.statCard, { backgroundColor: theme.card }]}>
-            <Text style={styles.statTitle}>TOTAL ITEMS</Text>
+            <Text style={styles.statTitle}>วัตถุดิบทั้งหมด</Text>
             <Text style={[styles.statValue, { color: theme.textDark }]}>{stats.totalItems}</Text>
-            <Text style={styles.statDesc}>in inventory</Text>
+            <Text style={styles.statDesc}>ในที่จัดเก็บ</Text>
           </View>
           
           <View style={[styles.statCard, { backgroundColor: theme.cardExpiring }]}>
-            <Text style={styles.statTitle}>EXPIRING SOON</Text>
+            <Text style={styles.statTitle}>ใกล้หมดอายุ</Text>
             <Text style={[styles.statValue, { color: theme.textExpiring }]}>{stats.expiringSoon}</Text>
-            <Text style={styles.statDesc}>within 3 days</Text>
+            <Text style={styles.statDesc}>ภายใน3วัน</Text>
           </View>
           
           <View style={[styles.statCard, { backgroundColor: theme.cardExpired }]}>
-            <Text style={styles.statTitle}>EXPIRED</Text>
+            <Text style={styles.statTitle}>หมดอายุ</Text>
             <Text style={[styles.statValue, { color: theme.textExpired }]}>{stats.expired}</Text>
-            <Text style={styles.statDesc}>needs removal</Text>
+            <Text style={styles.statDesc}>ต้องลบข้อมูล</Text>
           </View>
           
           <View style={[styles.statCard, { backgroundColor: theme.cardLowStock }]}>
-            <Text style={styles.statTitle}>LOW STOCK</Text>
+            <Text style={styles.statTitle}>สต๊อคเหลือน้อย</Text>
             <Text style={[styles.statValue, { color: theme.textLowStock }]}>{stats.lowStock}</Text>
-            <Text style={styles.statDesc}>below par level</Text>
+            <Text style={styles.statDesc}> ต่ำกว่ามาตรฐาน</Text>
           </View>
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Needs Action Today</Text>
+          <Text style={styles.sectionTitle}>ต้องรีบใช้วันนี้แล้วนะ!</Text>
           <View style={styles.sectionBadge}>
             <Text style={styles.sectionBadgeText}>{actionItems.length} items</Text>
           </View>
@@ -220,12 +221,12 @@ export default function HomeScreen({ navigation }: any) {
           )}
         </View>
 
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <Text style={styles.sectionTitle}>เมนูลัด</Text>
         <View style={styles.quickActionsGrid}>
           
           <TouchableOpacity style={[styles.quickBtn, styles.quickBtnPrimary]}>
             <Feather name="maximize" size={24} color="#FFF" />
-            <Text style={[styles.quickBtnText, { color: '#FFF' }]}>Scan</Text>
+            <Text style={[styles.quickBtnText, { color: '#FFF' }]}>สแกน</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -233,21 +234,74 @@ export default function HomeScreen({ navigation }: any) {
             onPress={() => navigation.navigate('AddIngredient')}
           >
             <Feather name="plus" size={24} color={theme.textDark} />
-            <Text style={styles.quickBtnText}>Add Item</Text>
+            <Text style={styles.quickBtnText}>เพิ่มของ</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.quickBtn}>
+          <TouchableOpacity 
+            style={styles.quickBtn}
+            onPress={() => navigation.navigate('MenuSuggestions')}
+          >
             <Feather name="book-open" size={24} color={theme.textDark} />
-            <Text style={styles.quickBtnText}>Menu AI</Text>
+            <Text style={styles.quickBtnText}>เมนู AI</Text>
           </TouchableOpacity>
           
-          {isManager && (
+          {isManager ? (
             <TouchableOpacity style={styles.quickBtn}>
               <Feather name="shopping-cart" size={24} color={theme.textDark} />
-              <Text style={styles.quickBtnText}>Buy Plan</Text>
+              <Text style={styles.quickBtnText}>แผนซื้อของ</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
+
+        <View style={[styles.sectionHeader, { marginTop: 16 }]}>
+          <Text style={styles.sectionTitle}>ใกล้หมดอายุ</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Inventory')}>
+            <Text style={{ fontFamily: 'Mali_400Regular', fontSize: 13, color: theme.textLight }}>ดูทั้งหมด</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          style={{ marginBottom: 24, marginHorizontal: -20 }} 
+          contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}
+        >
+          {expiringItemsOnly.length === 0 ? (
+            <Text style={{ fontFamily: 'Mali_400Regular', color: theme.textLight }}>ไม่มีวัตถุดิบใกล้หมดอายุ</Text>
+          ) : (
+            expiringItemsOnly.map((item) => (
+              <View key={`near-${item.id}`} style={styles.nearExpiryCard}>
+                <View style={styles.nearExpiryCategory}>
+                  <Text style={styles.nearExpiryCategoryText}>{item.category || 'General'}</Text>
+                </View>
+                <Text style={styles.nearExpiryName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.nearExpiryQty}>{item.quantity} {item.unit}</Text>
+                <Text style={styles.nearExpiryDays}>{item.daysLeft} วันที่เหลือ</Text>
+              </View>
+            ))
+          )}
+        </ScrollView>
+
+        {expiringItemsOnly.length > 0 ? (
+          <TouchableOpacity 
+            style={styles.aiCard}
+            onPress={() => navigation.navigate('MenuSuggestions')}
+          >
+            <View style={styles.aiIconBg}>
+              <Feather name="zap" size={20} color="#FFF" />
+            </View>
+            <View style={styles.aiContent}>
+              <Text style={styles.aiTitle}>AI SUGGESTION</Text>
+              <Text style={styles.aiDesc}>
+                มีไอเดียเมนูจากวัตถุดิบใกล้หมดอายุของคุณ กดเพื่อดูเลย!
+              </Text>
+              <View style={styles.aiLinkRow}>
+                <Text style={styles.aiLinkText}>ดูเมนูแนะนำ</Text>
+                <Feather name="chevron-right" size={16} color="#FFF" />
+              </View>
+            </View>
+          </TouchableOpacity>
+        ) : null}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -280,9 +334,9 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
                   ))}
                   
-                  {actionItems.length > 3 && (
+                  {actionItems.length > 3 ? (
                     <Text style={styles.popupMoreText}>+{actionItems.length - 3} more items...</Text>
-                  )}
+                  ) : null}
                 </>
               )}
             </View>
@@ -307,67 +361,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
-  
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+ header: { 
     marginBottom: 24,
+    // 🔴 (เอา flexDirection: 'row' ของเดิมออก) 
   },
-  dateText: {
-    fontFamily: 'Mali_700Bold',
-    fontSize: 11,
-    color: theme.textLight,
-    letterSpacing: 1,
-    marginBottom: 4,
-    textTransform: 'uppercase',
+  
+  // 🔴 สไตล์ใหม่สำหรับจัดบรรทัดชื่อร้านและกระดิ่ง
+  locationAndNotificationRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginTop: 12 
   },
-  greetingText: {
-    fontFamily: 'Mali_700Bold',
-    fontSize: 24,
-    color: theme.textDark,
+  dateText: { fontFamily: 'Mali_700Bold', fontSize: 11, color: theme.textLight, letterSpacing: 1, marginBottom: 4, textTransform: 'uppercase' },
+  greetingText: { fontFamily: 'Mali_700Bold', fontSize: 24, color: theme.textDark },
+  
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  restaurantSubtext: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight },
+  
+  notificationBtn: { 
+    backgroundColor: theme.card, 
+    padding: 10, // 🔴 ลด padding ลงนิดนึงไม่ให้กระดิ่งดูเทอะทะ
+    borderRadius: 99, 
+    position: 'relative' 
   },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-    gap: 4,
-  },
-  restaurantSubtext: {
-    fontFamily: 'Mali_400Regular',
-    fontSize: 13,
-    color: theme.textLight,
-  },
-  notificationBtn: {
-    backgroundColor: theme.card,
-    padding: 12,
-    borderRadius: 99,
-    position: 'relative',
-    marginRight: 6, // 🔴 ดันเข้ามาไม่ให้ชิดขอบจอเกินไป
-  },
-  badgeContainer: {
-    position: 'absolute',
-    top: -4,
-    right: -2, // 🔴 ลดระยะยื่น เพื่อไม่ให้ตัวเลขตกขอบ
-    backgroundColor: theme.danger,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: theme.background,
-    paddingHorizontal: 4,
-  },
-  badgeNumber: {
-    color: '#FFF',
-    fontSize: 10,
-    fontFamily: 'Mali_700Bold',
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-    marginTop: Platform.OS === 'android' ? -2 : 0, 
-  },
-
+  badgeContainer: { position: 'absolute', top: -4, right: -4, backgroundColor: theme.danger, borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.background, paddingHorizontal: 4 },
+  badgeNumber: { color: '#FFF', fontSize: 10, fontFamily: 'Mali_700Bold', includeFontPadding: false, textAlignVertical: 'center', marginTop: Platform.OS === 'android' ? -2 : 0 },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -402,7 +421,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.textLight,
   },
-
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -425,7 +443,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: theme.badgeText,
   },
-
   actionList: {
     marginBottom: 32,
     gap: 12,
@@ -473,7 +490,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Mali_700Bold',
     fontSize: 11,
   },
-
   emptyCard: {
     backgroundColor: theme.card,
     borderRadius: 20,
@@ -491,7 +507,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.textLight,
   },
-
   quickActionsGrid: {
     flexDirection: 'row',
     gap: 12,
@@ -519,7 +534,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.textDark,
   },
-
   popupOverlay: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -574,5 +588,91 @@ const styles = StyleSheet.create({
     color: theme.textLight,
     marginTop: 4,
     textAlign: 'center',
+  },
+  nearExpiryCard: {
+    backgroundColor: theme.card,
+    width: 140,
+    padding: 16,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  nearExpiryCategory: {
+    backgroundColor: theme.badgeBg,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  nearExpiryCategoryText: {
+    fontFamily: 'Mali_400Regular',
+    fontSize: 10,
+    color: theme.textLight,
+    textTransform: 'capitalize',
+  },
+  nearExpiryName: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 14,
+    color: theme.textDark,
+    marginBottom: 4,
+  },
+  nearExpiryQty: {
+    fontFamily: 'Mali_400Regular',
+    fontSize: 12,
+    color: theme.textLight,
+  },
+  nearExpiryDays: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 12,
+    color: theme.textExpiring,
+    marginTop: 8,
+  },
+  aiCard: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 24,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    overflow: 'hidden',
+  },
+  aiIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  aiContent: {
+    flex: 1,
+  },
+  aiTitle: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  aiDesc: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 16,
+    color: '#FFF',
+    lineHeight: 24,
+    marginBottom: 12,
+  },
+  aiLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  aiLinkText: {
+    fontFamily: 'Mali_700Bold',
+    fontSize: 13,
+    color: '#FFF',
+    marginRight: 4,
   },
 });

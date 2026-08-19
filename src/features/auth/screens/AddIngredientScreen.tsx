@@ -12,6 +12,7 @@ import {
   Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker'; // 🔴 นำเข้า DatePicker
 import { useAuth } from '../../../context/AuthContext';
 import apiClient from '../../../api/client';
 
@@ -25,20 +26,24 @@ const theme = {
   border: '#E8E6E1',
   danger: '#DC2626',
   success: '#10B981',
+  successBg: '#E6F4EA',
 };
 
-const CATEGORY_MAP: Record<string, string[]> = {
-  'ผักและผลไม้': ['กิโลกรัม', 'กรัม', 'กำ', 'ต้น', 'หัว', 'แพ็ค'],
-  'เนื้อสัตว์': ['กิโลกรัม', 'กรัม', 'ชิ้น', 'แพ็ค'],
-  'อาหารทะเล': ['กิโลกรัม', 'กรัม', 'ตัว', 'แพ็ค'],
-  'นมและไข่': ['ฟอง', 'แผง', 'ลิตร', 'มิลลิลิตร', 'ขวด', 'แกลลอน'],
-  'เครื่องปรุง': ['ขวด', 'ถุง', 'ลิตร', 'มิลลิลิตร', 'ช้อนโต๊ะ', 'กรัม'],
-  'ของแห้ง': ['ถุง', 'แพ็ค', 'กิโลกรัม', 'กรัม', 'กระสอบ'],
-  'เครื่องดื่ม': ['ขวด', 'กระป๋อง', 'ลิตร', 'แพ็ค', 'ลัง'],
-  'อื่นๆ': ['ชิ้น', 'แพ็ค', 'กล่อง', 'กิโลกรัม', 'กรัม']
+// อัปเดต CATEGORY_MAP เพื่อแนบจำนวนวันหมดอายุที่แนะนำ (addDays)
+const CATEGORY_MAP: Record<string, { units: string[], addDays: number }> = {
+  'ผักและผลไม้': { units: ['กิโลกรัม', 'กรัม', 'กำ', 'ต้น', 'หัว', 'แพ็ค'], addDays: 5 },
+  'เนื้อสัตว์': { units: ['กิโลกรัม', 'กรัม', 'ชิ้น', 'แพ็ค'], addDays: 3 },
+  'อาหารทะเล': { units: ['กิโลกรัม', 'กรัม', 'ตัว', 'แพ็ค'], addDays: 2 },
+  'นมและไข่': { units: ['ฟอง', 'แผง', 'ลิตร', 'มิลลิลิตร', 'ขวด', 'แกลลอน'], addDays: 7 },
+  'เครื่องปรุง': { units: ['ขวด', 'ถุง', 'ลิตร', 'มิลลิลิตร', 'ช้อนโต๊ะ', 'กรัม'], addDays: 365 },
+  'ของแห้ง': { units: ['ถุง', 'แพ็ค', 'กิโลกรัม', 'กรัม', 'กระสอบ'], addDays: 180 },
+  'เครื่องดื่ม': { units: ['ขวด', 'กระป๋อง', 'ลิตร', 'แพ็ค', 'ลัง'], addDays: 180 },
+  'อื่นๆ': { units: ['ชิ้น', 'แพ็ค', 'กล่อง', 'กิโลกรัม', 'กรัม'], addDays: 7 }
 };
 
 const CATEGORIES = Object.keys(CATEGORY_MAP);
+const STORAGE_LOCATIONS = ['Walk-in Fridge', 'Freezer A', 'Freezer B', 'Dry Pantry', 'Countertop'];
+const NOTIFY_DAYS = ['1', '2', '3', '5', '7'];
 
 export default function AddIngredientScreen({ navigation }: any) {
   const { user } = useAuth();
@@ -48,13 +53,21 @@ export default function AddIngredientScreen({ navigation }: any) {
   const [lotName, setLotName] = useState('');
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [quantity, setQuantity] = useState('');
-  const [unit, setUnit] = useState(CATEGORY_MAP[CATEGORIES[0]][0]);
+  const [unit, setUnit] = useState(CATEGORY_MAP[CATEGORIES[0]].units[0]);
   const [customUnit, setCustomUnit] = useState(''); 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isCustomUnit, setIsCustomUnit] = useState(false);
+  
+  // State วันหมดอายุ
   const [expiryDate, setExpiryDate] = useState('');
-  const [notifyDaysBefore, setNotifyDaysBefore] = useState('2');
-  const [storageLocation, setStorageLocation] = useState('');
+  const [isManualExpiry, setIsManualExpiry] = useState(false);
+  const [suggestedDate, setSuggestedDate] = useState('');
+  
+  // 🔴 State สำหรับเปิด/ปิด ปฏิทิน
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  const [notifyDaysBefore, setNotifyDaysBefore] = useState(NOTIFY_DAYS[1]);
+  const [storageLocation, setStorageLocation] = useState(STORAGE_LOCATIONS[0]);
   const [parts, setParts] = useState([{ partName: '', quantity: '' }]);
 
   const [modalConfig, setModalConfig] = useState({
@@ -72,13 +85,44 @@ export default function AddIngredientScreen({ navigation }: any) {
     setModalConfig(prev => ({ ...prev, visible: false }));
   };
 
+  // คำนวณวันหมดอายุแนะนำ
+  const calculateSuggestedDate = (daysToAdd: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() + daysToAdd);
+    return date.toISOString().split('T')[0];
+  };
+
   useEffect(() => {
-    const suggestedUnits = CATEGORY_MAP[category];
-    setUnit(suggestedUnits[0]);
+    const catInfo = CATEGORY_MAP[category];
+    setUnit(catInfo.units[0]);
     setIsCustomUnit(false);
     setCustomUnit('');
     setIsDropdownOpen(false);
+
+    // คำนวณวันหมดอายุใหม่เมื่อเปลี่ยนหมวดหมู่
+    const newSuggestedDate = calculateSuggestedDate(catInfo.addDays);
+    setSuggestedDate(newSuggestedDate);
+    
+    // ถ้าผู้ใช้ยังไม่เคยจิ้มเลือกปฏิทินเอง ให้ระบบเปลี่ยนให้เลย
+    if (!isManualExpiry) {
+      setExpiryDate(newSuggestedDate);
+    }
   }, [category]);
+
+  // 🔴 ฟังก์ชันจัดการเมื่อเลือกวันที่จากปฏิทินเสร็จ
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false); // ปิดปฏิทิน
+    if (selectedDate) {
+      setExpiryDate(selectedDate.toISOString().split('T')[0]);
+      setIsManualExpiry(true); // รู้ว่าผู้ใช้ตั้งใจเลือกเองแล้ว
+    }
+  };
+
+  // ฟังก์ชันเวลากดป้ายแนะนำให้ดึงค่าแนะนำมาใช้ทันที
+  const applySuggestedDate = () => {
+    setExpiryDate(suggestedDate);
+    setIsManualExpiry(false);
+  };
 
   const handleAddPart = () => {
     setParts([...parts, { partName: '', quantity: '' }]);
@@ -118,6 +162,7 @@ export default function AddIngredientScreen({ navigation }: any) {
           categoryUnitHint: finalUnit,
           expiryDate,
           notifyDaysBefore: parseInt(notifyDaysBefore, 10),
+          storageLocation 
         };
         await apiClient.post('/ingredients', payload);
       } else {
@@ -135,6 +180,7 @@ export default function AddIngredientScreen({ navigation }: any) {
           categoryUnitHint: finalUnit,
           expiryDate,
           notifyDaysBefore: parseInt(notifyDaysBefore, 10),
+          storageLocation, 
           items,
         };
         await apiClient.post('/ingredients/batch', payload);
@@ -173,7 +219,7 @@ export default function AddIngredientScreen({ navigation }: any) {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>{addMode === 'SINGLE' ? 'INGREDIENT NAME' : 'LOT NAME'}</Text>
+          <Text style={styles.label}>{addMode === 'SINGLE' ? 'ชื่อวัตถุดิบ' : 'ชื่อล็อควัตถุดิบ'}</Text>
           <TextInput
             style={styles.input}
             placeholder={addMode === 'SINGLE' ? "e.g. แซลมอนนอร์เวย์" : "e.g. เนื้อหมูยกแผง"}
@@ -184,7 +230,7 @@ export default function AddIngredientScreen({ navigation }: any) {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>CATEGORY</Text>
+          <Text style={styles.label}>หมวดหมู่</Text>
           <View style={styles.categoryContainer}>
             {CATEGORIES.map((cat) => (
               <TouchableOpacity key={cat} style={[styles.categoryPill, category === cat ? styles.categoryPillActive : undefined]} onPress={() => setCategory(cat)}>
@@ -197,13 +243,13 @@ export default function AddIngredientScreen({ navigation }: any) {
         <View style={[styles.rowGroup, { zIndex: 1000 }]}>
           {addMode === 'SINGLE' ? (
             <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.label}>QUANTITY</Text>
+              <Text style={styles.label}>จำนวน</Text>
               <TextInput style={styles.input} placeholder="0.0" placeholderTextColor={theme.textLight} keyboardType="numeric" value={quantity} onChangeText={setQuantity} />
             </View>
           ) : null}
 
           <View style={[styles.inputGroup, { flex: addMode === 'SINGLE' ? 1.5 : 1, zIndex: 1000 }]}>
-            <Text style={styles.label}>UNIT</Text>
+            <Text style={styles.label}>หน่วย</Text>
             <View style={{ position: 'relative', zIndex: 1000 }}>
               <TouchableOpacity style={[styles.dropdownHeader, isDropdownOpen ? styles.dropdownHeaderActive : undefined]} onPress={() => setIsDropdownOpen(!isDropdownOpen)} activeOpacity={0.7}>
                 <Text style={[styles.dropdownHeaderText, (!unit && !isCustomUnit) ? { color: theme.textLight } : undefined]}>
@@ -214,7 +260,7 @@ export default function AddIngredientScreen({ navigation }: any) {
 
               {isDropdownOpen ? (
                 <View style={styles.dropdownListAbsolute}>
-                  {CATEGORY_MAP[category].map((u) => (
+                  {CATEGORY_MAP[category].units.map((u) => (
                     <TouchableOpacity key={u} style={styles.dropdownItem} onPress={() => { setUnit(u); setIsCustomUnit(false); setIsDropdownOpen(false); }}>
                       <Text style={[styles.dropdownItemText, unit === u && !isCustomUnit ? styles.dropdownItemTextActive : undefined]}>{u}</Text>
                       {unit === u && !isCustomUnit ? (<Feather name="check" size={16} color={theme.primary} />) : null}
@@ -233,35 +279,97 @@ export default function AddIngredientScreen({ navigation }: any) {
           </View>
         </View>
 
+        {/* 🔴 ส่วนอัปเดต Date Picker และป้ายแนะนำตลอดเวลา */}
         <View style={[styles.inputGroup, { zIndex: 1 }]}>
-          <Text style={styles.label}>EXPIRY DATE (YYYY-MM-DD)</Text>
+          <Text style={styles.label}>วันหมดอายุ (YYYY-MM-DD)</Text>
           <View style={styles.inputWithIconContainer}>
-            <TextInput style={[styles.input, { flex: 1, paddingRight: 50 }]} placeholder="2026-08-09" placeholderTextColor={theme.textLight} value={expiryDate} onChangeText={setExpiryDate} />
+            
+            {/* เปลี่ยนเป็นปุ่มกดเพื่อเปิดปฏิทิน */}
+            <TouchableOpacity 
+              style={[styles.input, { flex: 1, justifyContent: 'center', paddingRight: 50 }]} 
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={{ fontFamily: 'Mali_400Regular', fontSize: 15, color: expiryDate ? theme.textDark : theme.textLight }}>
+                {expiryDate || 'เลือกวันหมดอายุ...'}
+              </Text>
+            </TouchableOpacity>
+
             <TouchableOpacity style={styles.cameraButton}>
               <Feather name="camera" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
+          
+          {/* ป้ายแนะนำวันหมดอายุ (โชว์ตลอดเวลา) */}
+          <TouchableOpacity style={styles.suggestedDatePill} onPress={applySuggestedDate}>
+            <Feather name="zap" size={14} color={theme.success} style={{ marginRight: 6 }} />
+            <Text style={styles.suggestedDateText}>
+              แนะนำสำหรับ {category}: <Text style={{ fontFamily: 'Mali_700Bold' }}>{suggestedDate}</Text> (+{CATEGORY_MAP[category].addDays} วัน)
+            </Text>
+          </TouchableOpacity>
+
           <View style={styles.ocrHint}>
             <Feather name="camera" size={12} color={theme.textLight} style={{ marginRight: 6 }} />
-            <Text style={styles.ocrHintText}>Tap the camera to scan expiry date with OCR</Text>
+            <Text style={styles.ocrHintText}>กดรูปกล้องเพื่อสแกนวันหมดอายุด้วย OCR</Text>
           </View>
         </View>
+
+        {/* ตัว Component ปฏิทินที่จะเด้งขึ้นมา */}
+        {showDatePicker && (
+          <DateTimePicker
+            value={expiryDate ? new Date(expiryDate) : new Date(suggestedDate || Date.now())}
+            mode="date"
+            display="default"
+            onChange={handleDateChange}
+          />
+        )}
 
         <View style={[styles.inputGroup, { zIndex: 1 }]}>
-          <Text style={styles.label}>STORAGE LOCATION</Text>
-          <TextInput style={styles.input} placeholder="Walk-in Fridge A" placeholderTextColor={theme.textLight} value={storageLocation} onChangeText={setStorageLocation} />
+          <Text style={styles.label}>ที่จัดเก็บ</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -24 }} contentContainerStyle={{ paddingHorizontal: 24, gap: 10 }}>
+            {STORAGE_LOCATIONS.map((loc) => (
+              <TouchableOpacity 
+                key={loc} 
+                style={[styles.scrollPill, storageLocation === loc ? styles.scrollPillActive : undefined]} 
+                onPress={() => setStorageLocation(loc)}
+              >
+                <Text style={[styles.scrollPillText, storageLocation === loc ? styles.scrollPillTextActive : undefined]}>{loc}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
 
-        <View style={[styles.rowGroup, { zIndex: 1 }]}>
-          <View style={[styles.inputGroup, { flex: 1 }]}>
-            <Text style={styles.label}>PAR LEVEL</Text>
-            <TextInput style={[styles.input, { backgroundColor: '#F3F4F6', color: theme.textLight }]} placeholder="0" placeholderTextColor={theme.textLight} editable={false} />
-          </View>
-          <View style={[styles.inputGroup, { flex: 1 }]}>
-            <Text style={styles.label}>NOTIFY (DAYS BEFORE)</Text>
-            <TextInput style={styles.input} placeholder="2" placeholderTextColor={theme.textLight} keyboardType="numeric" value={notifyDaysBefore} onChangeText={setNotifyDaysBefore} />
-          </View>
+        {/* 🔴 Par Level (แยกบรรทัดมาเดี่ยวๆ) */}
+        <View style={[styles.inputGroup, { zIndex: 1 }]}>
+          <Text style={styles.label}>ปริมาณขั้นต่ำที่ต้องมี</Text>
+          <TextInput 
+            style={[styles.input, { backgroundColor: '#F3F4F6', color: theme.textLight }]} 
+            placeholder="ระบบคำนวณให้อัตโนมัติ (20% ของเริ่มต้น)" 
+            placeholderTextColor={theme.textLight} 
+            editable={false} 
+          />
         </View>
+
+        {/* 🔴 แจ้งเตือนล่วงหน้า (แยกบรรทัด ให้เลื่อนแนวนอนได้ยาวๆ เต็มจอ) */}
+        <View style={[styles.inputGroup, { zIndex: 1 }]}>
+          <Text style={styles.label}>แจ้งเตือนล่วงหน้าก่อนหมดอายุ</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            style={{ marginHorizontal: -24 }} 
+            contentContainerStyle={{ paddingHorizontal: 24, gap: 10 }}
+          >
+            {NOTIFY_DAYS.map((days) => (
+              <TouchableOpacity 
+                key={days} 
+                style={[styles.scrollPill, notifyDaysBefore === days ? styles.scrollPillActive : undefined]} 
+                onPress={() => setNotifyDaysBefore(days)}
+              >
+                <Text style={[styles.scrollPillText, notifyDaysBefore === days ? styles.scrollPillTextActive : undefined]}>{days} วัน</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+        
 
         {addMode === 'BATCH' ? (
           <View style={styles.partsSection}>
@@ -327,11 +435,18 @@ const styles = StyleSheet.create({
   rowGroup: { flexDirection: 'row', gap: 16 },
   label: { fontFamily: 'Mali_700Bold', fontSize: 11, color: theme.textLight, marginBottom: 8, letterSpacing: 1 },
   input: { fontFamily: 'Mali_400Regular', backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 16, height: 54, fontSize: 15, color: theme.textDark, borderWidth: 1, borderColor: theme.border },
+  
   categoryContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   categoryPill: { backgroundColor: theme.inputBg, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: theme.border },
   categoryPillActive: { backgroundColor: theme.primary, borderColor: theme.primary },
   categoryText: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight },
   categoryTextActive: { fontFamily: 'Mali_700Bold', color: '#FFF' },
+  
+  scrollPill: { backgroundColor: theme.inputBg, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: theme.border },
+  scrollPillActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+  scrollPillText: { fontFamily: 'Mali_700Bold', fontSize: 13, color: theme.textLight },
+  scrollPillTextActive: { color: '#FFF' },
+
   dropdownHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 16, height: 54, borderWidth: 1, borderColor: theme.border },
   dropdownHeaderActive: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 0 },
   dropdownHeaderText: { fontFamily: 'Mali_400Regular', fontSize: 15, color: theme.textDark },
@@ -339,18 +454,26 @@ const styles = StyleSheet.create({
   dropdownItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   dropdownItemText: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight },
   dropdownItemTextActive: { fontFamily: 'Mali_700Bold', color: theme.primary },
+  
   inputWithIconContainer: { position: 'relative', justifyContent: 'center' },
   cameraButton: { position: 'absolute', right: 8, backgroundColor: theme.primary, width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  
+  suggestedDatePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.successBg, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, marginTop: 12 },
+  suggestedDateText: { fontFamily: 'Mali_400Regular', fontSize: 12, color: theme.success },
+
   ocrHint: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginLeft: 4 },
   ocrHintText: { fontFamily: 'Mali_400Regular', fontSize: 12, color: theme.textLight },
+  
   partsSection: { backgroundColor: '#F3F4F6', padding: 16, borderRadius: 20, marginBottom: 20 },
   partRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   removePartBtn: { padding: 10, marginLeft: 4 },
   addPartBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
   addPartBtnText: { fontFamily: 'Mali_700Bold', fontSize: 14, color: theme.primary },
+  
   footer: { paddingHorizontal: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 20, paddingTop: 10, backgroundColor: theme.background },
   mainSaveButton: { backgroundColor: theme.primary, height: 56, borderRadius: 99, justifyContent: 'center', alignItems: 'center', shadowColor: theme.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   mainSaveButtonText: { fontFamily: 'Mali_700Bold', color: '#FFFFFF', fontSize: 16 },
+  
   modalOverlay: { flex: 1, backgroundColor: 'rgba(74, 54, 35, 0.4)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   modalContainer: { backgroundColor: theme.card, width: '100%', borderRadius: 32, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 15 },
   modalIconBg: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },

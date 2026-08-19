@@ -11,6 +11,7 @@ import InventoryScreen from './InventoryScreen';
 import AddIngredientScreen from './AddIngredientScreen'; 
 import AlertsScreen from './AlertsScreen';
 import IngredientDetailScreen from './IngredientDetailScreen';
+import MenuSuggestionsScreen from './MenuSuggestionsScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
@@ -222,7 +223,7 @@ const TeamScreen = () => {
           {/* 🔴 แก้ไขจุดบั๊กของหน้า Team ที่ทำให้จอแดง */}
           {isManager && restaurant?.inviteCode ? (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>TEAM INVITE CODE</Text>
+              <Text style={styles.sectionTitle}>โค้ดเชิญเข้าร่วมร้าน</Text>
               <View style={styles.inviteCard}>
                 <View style={styles.inviteTextWrapper}>
                   <Text style={styles.inviteCode}>{restaurant.inviteCode}</Text>
@@ -237,7 +238,7 @@ const TeamScreen = () => {
 
           <View style={styles.section}>
             <View style={styles.memberHeader}>
-              <Text style={styles.sectionTitle}>MEMBERS ({members.length})</Text>
+              <Text style={styles.sectionTitle}>สมาชิก ({members.length})</Text>
             </View>
 
             {members.map((item) => (
@@ -331,7 +332,7 @@ function MainTabNavigator() {
           let iconName: any = 'home';
           if (route.name === 'Home') iconName = 'home';
           else if (route.name === 'Inventory') iconName = 'box';
-          else if (route.name === 'Alerts') iconName = 'bell';
+          else if (route.name === 'Notifications') iconName = 'bell'; 
           else if (route.name === 'Team') iconName = 'users';
           return <Feather name={iconName} size={24} color={color} />;
         },
@@ -353,7 +354,7 @@ function MainTabNavigator() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Inventory" component={InventoryScreen} />
-      <Tab.Screen name="Alerts" component={AlertsScreen} />
+      <Tab.Screen name="Notifications" component={AlertsScreen} />
       <Tab.Screen name="Team" component={TeamScreen} />
     </Tab.Navigator>
   );
@@ -365,6 +366,7 @@ export default function MainDashboard() {
       <Stack.Screen name="MainTabs" component={MainTabNavigator} />
       <Stack.Screen name="AddIngredient" component={AddIngredientScreen} />
       <Stack.Screen name="IngredientDetail" component={IngredientDetailScreen} />
+      <Stack.Screen name="MenuSuggestions" component={MenuSuggestionsScreen} />
     </Stack.Navigator>
   );
 }
