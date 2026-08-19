@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import apiClient, { setGlobalToken } from '../api/client'; 
 import { User } from '../types';
+import { clearSuggestionCache } from '../api/suggestionCache';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -99,6 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('SecureStore not available to reset');
     }
     tokenFallback = '';
+    clearSuggestionCache(); // ล้างเมนูที่ AI แนะนำไว้ ไม่ให้ค้างข้ามผู้ใช้
     setUser(null);
     setIsAuthenticated(false);
   };

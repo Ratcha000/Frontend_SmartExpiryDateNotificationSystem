@@ -12,13 +12,13 @@ import {
   ScrollView,
   Modal,
 } from 'react-native';
-import { useFonts, Mali_400Regular, Mali_700Bold } from '@expo-google-fonts/mali';
 import { Feather } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store'; // 🔴 นำเข้า SecureStore เพื่อใช้จำประวัติการมีร้าน
 import { useAuth } from '../../../context/AuthContext';
 
 import { restaurantService } from '../../../api/restaurants';
 import { authApi } from '../../../api/auth';
+import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
 
 const theme = {
   background: '#F5F3E9',
@@ -32,7 +32,6 @@ const theme = {
 };
 
 export default function AccountScreen() {
-  const [fontsLoaded] = useFonts({ Mali_400Regular, Mali_700Bold });
   const { user, logout, setUser } = useAuth();
   
   const [mode, setMode] = useState<'SELECT' | 'CREATE' | 'JOIN'>('SELECT');
@@ -119,8 +118,6 @@ export default function AccountScreen() {
       setLoading(false);
     }
   };
-
-  if (!fontsLoaded) return <View style={styles.loadingScreen}><ActivityIndicator color={theme.primary} /></View>;
 
   return (
     <View style={styles.container}>
@@ -264,35 +261,35 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: 10 },
   userInfo: { flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 10 },
   userAvatar: { fontSize: 18, marginRight: 8 },
-  userName: { fontFamily: 'Mali_700Bold', fontSize: 14, color: theme.textDark },
+  userName: { fontFamily: FONT_BOLD, fontSize: 14, color: theme.textDark },
   logoutButton: { backgroundColor: theme.inputBg, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 12 },
-  logoutButtonText: { fontFamily: 'Mali_700Bold', fontSize: 12, color: theme.danger },
+  logoutButtonText: { fontFamily: FONT_BOLD, fontSize: 12, color: theme.danger },
   
   content: { flex: 1, paddingHorizontal: 24, justifyContent: 'center', paddingBottom: 120 }, 
   
   header: { alignItems: 'center', marginBottom: 40 },
   icon: { fontSize: 48, marginBottom: 16 },
   
-  title: { fontFamily: 'Mali_700Bold', fontSize: 24, color: theme.textDark, marginBottom: 8, textAlign: 'center' },
-  subtitle: { fontFamily: 'Mali_400Regular', fontSize: 16, color: theme.textLight, textAlign: 'center' },
+  title: { fontFamily: FONT_BOLD, fontSize: 24, color: theme.textDark, marginBottom: 8, textAlign: 'center' },
+  subtitle: { fontFamily: FONT_REGULAR, fontSize: 16, color: theme.textLight, textAlign: 'center' },
   
   optionsContainer: { width: '100%', gap: 16 },
   optionCard: { backgroundColor: theme.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: theme.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
   optionIcon: { fontSize: 32, marginBottom: 12 },
-  optionTitle: { fontFamily: 'Mali_700Bold', fontSize: 18, color: theme.textDark, marginBottom: 6 },
-  optionDesc: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight, lineHeight: 20 },
+  optionTitle: { fontFamily: FONT_BOLD, fontSize: 18, color: theme.textDark, marginBottom: 6 },
+  optionDesc: { fontFamily: FONT_REGULAR, fontSize: 14, color: theme.textLight, lineHeight: 20 },
   
   formContainer: { backgroundColor: theme.card, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 4 },
   backButton: { alignSelf: 'flex-start', marginBottom: 16, paddingVertical: 8 },
-  backButtonText: { fontFamily: 'Mali_700Bold', fontSize: 14, color: theme.textLight },
-  formTitle: { fontFamily: 'Mali_700Bold', fontSize: 20, color: theme.textDark, marginBottom: 24 },
+  backButtonText: { fontFamily: FONT_BOLD, fontSize: 14, color: theme.textLight },
+  formTitle: { fontFamily: FONT_BOLD, fontSize: 20, color: theme.textDark, marginBottom: 24 },
   
   inputGroup: { marginBottom: 24 },
-  label: { fontFamily: 'Mali_700Bold', fontSize: 11, color: theme.textLight, marginBottom: 8, marginLeft: 4, letterSpacing: 1 },
-  input: { fontFamily: 'Mali_400Regular', backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 18, height: 52, fontSize: 15, color: theme.textDark },
+  label: { fontFamily: FONT_BOLD, fontSize: 11, color: theme.textLight, marginBottom: 8, marginLeft: 4, letterSpacing: 1 },
+  input: { fontFamily: FONT_REGULAR, backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 18, height: 52, fontSize: 15, color: theme.textDark },
   
   submitButton: { backgroundColor: theme.primary, height: 56, borderRadius: 99, justifyContent: 'center', alignItems: 'center', shadowColor: theme.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
-  submitButtonText: { fontFamily: 'Mali_700Bold', color: '#FFFFFF', fontSize: 16 },
+  submitButtonText: { fontFamily: FONT_BOLD, color: '#FFFFFF', fontSize: 16 },
 
   modalOverlay: {
     flex: 1,
@@ -322,14 +319,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 22,
     color: theme.textDark,
     marginBottom: 8,
     textAlign: 'center',
   },
   modalMessage: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 14,
     color: theme.textLight,
     textAlign: 'center',
@@ -348,7 +345,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalButtonConfirmText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 15,
     color: '#FFF',
   },

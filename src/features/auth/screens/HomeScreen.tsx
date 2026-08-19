@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../../context/AuthContext';
 import apiClient from '../../../api/client';
+import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
 
 const theme = {
   background: '#F9F8F4',
@@ -184,36 +185,37 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
+        {/* แสดงเฉพาะของที่ใกล้หมดอายุ ไม่รวมของที่หมดอายุไปแล้ว */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>ต้องรีบใช้วันนี้แล้วนะ!</Text>
           <View style={styles.sectionBadge}>
-            <Text style={styles.sectionBadgeText}>{actionItems.length} items</Text>
+            <Text style={styles.sectionBadgeText}>{expiringItemsOnly.length} items</Text>
           </View>
         </View>
 
         <View style={styles.actionList}>
-          {actionItems.length === 0 ? (
+          {expiringItemsOnly.length === 0 ? (
             <View style={styles.emptyCard}>
               <Feather name="check-circle" size={32} color={theme.textLight} />
               <Text style={styles.emptyText}>No items requiring action today</Text>
             </View>
           ) : (
-            actionItems.map((item) => (
+            expiringItemsOnly.map((item) => (
               <View key={item.id} style={styles.actionCard}>
                 <View style={styles.actionInfo}>
-                  <View style={[styles.dotIndicator, { backgroundColor: item.expired || item.status === 'EXPIRED' ? theme.textExpired : theme.textExpiring }]} />
+                  <View style={[styles.dotIndicator, { backgroundColor: theme.textExpiring }]} />
                   <View>
                     <Text style={styles.actionName}>{item.name}</Text>
                     <Text style={styles.actionDesc}>
-                      {item.quantity} {item.unit} • <Text style={{ color: item.expired || item.status === 'EXPIRED' ? theme.textExpired : theme.textExpiring }}>
-                        {item.daysLeft < 0 ? `${Math.abs(item.daysLeft)} days overdue` : `${item.daysLeft} days left`}
+                      {item.quantity} {item.unit} • <Text style={{ color: theme.textExpiring }}>
+                        {item.daysLeft} days left
                       </Text>
                     </Text>
                   </View>
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: item.expired || item.status === 'EXPIRED' ? theme.cardExpired : theme.cardExpiring }]}>
-                  <Text style={[styles.statusBadgeText, { color: item.expired || item.status === 'EXPIRED' ? theme.textExpired : theme.textExpiring }]}>
-                    {item.expired || item.status === 'EXPIRED' ? 'Expired' : 'Near Expiry'}
+                <View style={[styles.statusBadge, { backgroundColor: theme.cardExpiring }]}>
+                  <Text style={[styles.statusBadgeText, { color: theme.textExpiring }]}>
+                    Near Expiry
                   </Text>
                 </View>
               </View>
@@ -256,7 +258,7 @@ export default function HomeScreen({ navigation }: any) {
         <View style={[styles.sectionHeader, { marginTop: 16 }]}>
           <Text style={styles.sectionTitle}>ใกล้หมดอายุ</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Inventory')}>
-            <Text style={{ fontFamily: 'Mali_400Regular', fontSize: 13, color: theme.textLight }}>ดูทั้งหมด</Text>
+            <Text style={{ fontFamily: FONT_REGULAR, fontSize: 13, color: theme.textLight }}>ดูทั้งหมด</Text>
           </TouchableOpacity>
         </View>
 
@@ -267,7 +269,7 @@ export default function HomeScreen({ navigation }: any) {
           contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}
         >
           {expiringItemsOnly.length === 0 ? (
-            <Text style={{ fontFamily: 'Mali_400Regular', color: theme.textLight }}>ไม่มีวัตถุดิบใกล้หมดอายุ</Text>
+            <Text style={{ fontFamily: FONT_REGULAR, color: theme.textLight }}>ไม่มีวัตถุดิบใกล้หมดอายุ</Text>
           ) : (
             expiringItemsOnly.map((item) => (
               <View key={`near-${item.id}`} style={styles.nearExpiryCard}>
@@ -373,11 +375,11 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     marginTop: 12 
   },
-  dateText: { fontFamily: 'Mali_700Bold', fontSize: 11, color: theme.textLight, letterSpacing: 1, marginBottom: 4, textTransform: 'uppercase' },
-  greetingText: { fontFamily: 'Mali_700Bold', fontSize: 24, color: theme.textDark },
+  dateText: { fontFamily: FONT_BOLD, fontSize: 11, color: theme.textLight, letterSpacing: 1, marginBottom: 4, textTransform: 'uppercase' },
+  greetingText: { fontFamily: FONT_BOLD, fontSize: 24, color: theme.textDark },
   
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  restaurantSubtext: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight },
+  restaurantSubtext: { fontFamily: FONT_REGULAR, fontSize: 14, color: theme.textLight },
   
   notificationBtn: { 
     backgroundColor: theme.card, 
@@ -386,7 +388,7 @@ const styles = StyleSheet.create({
     position: 'relative' 
   },
   badgeContainer: { position: 'absolute', top: -4, right: -4, backgroundColor: theme.danger, borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.background, paddingHorizontal: 4 },
-  badgeNumber: { color: '#FFF', fontSize: 10, fontFamily: 'Mali_700Bold', includeFontPadding: false, textAlignVertical: 'center', marginTop: Platform.OS === 'android' ? -2 : 0 },
+  badgeNumber: { color: '#FFF', fontSize: 10, fontFamily: FONT_BOLD, includeFontPadding: false, textAlignVertical: 'center', marginTop: Platform.OS === 'android' ? -2 : 0 },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -404,20 +406,20 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   statTitle: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 10,
     color: theme.textLight,
     letterSpacing: 0.5,
     marginBottom: 8,
   },
   statValue: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 32,
     lineHeight: 38,
     marginBottom: 4,
   },
   statDesc: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 12,
     color: theme.textLight,
   },
@@ -428,7 +430,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 18,
     color: theme.textDark,
   },
@@ -439,7 +441,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   sectionBadgeText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 11,
     color: theme.badgeText,
   },
@@ -471,12 +473,12 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   actionName: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 15,
     color: theme.textDark,
   },
   actionDesc: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 13,
     color: theme.textLight,
     marginTop: 2,
@@ -487,7 +489,7 @@ const styles = StyleSheet.create({
     borderRadius: 99,
   },
   statusBadgeText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 11,
   },
   emptyCard: {
@@ -503,7 +505,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   emptyText: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 14,
     color: theme.textLight,
   },
@@ -530,7 +532,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.primary,
   },
   quickBtnText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 12,
     color: theme.textDark,
   },
@@ -555,7 +557,7 @@ const styles = StyleSheet.create({
     borderColor: theme.border,
   },
   popupTitle: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 14,
     color: theme.textDark,
     marginBottom: 12,
@@ -572,18 +574,18 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   popupItemText: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 12,
     color: theme.textDark,
     flex: 1,
   },
   popupEmptyText: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 12,
     color: theme.textLight,
   },
   popupMoreText: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 11,
     color: theme.textLight,
     marginTop: 4,
@@ -609,24 +611,24 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   nearExpiryCategoryText: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 10,
     color: theme.textLight,
     textTransform: 'capitalize',
   },
   nearExpiryName: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 14,
     color: theme.textDark,
     marginBottom: 4,
   },
   nearExpiryQty: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 12,
     color: theme.textLight,
   },
   nearExpiryDays: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 12,
     color: theme.textExpiring,
     marginTop: 8,
@@ -652,14 +654,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   aiTitle: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 12,
     color: 'rgba(255,255,255,0.6)',
     letterSpacing: 1,
     marginBottom: 4,
   },
   aiDesc: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 16,
     color: '#FFF',
     lineHeight: 24,
@@ -670,7 +672,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   aiLinkText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 13,
     color: '#FFF',
     marginRight: 4,

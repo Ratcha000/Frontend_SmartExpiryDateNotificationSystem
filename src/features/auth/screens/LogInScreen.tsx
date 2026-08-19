@@ -15,7 +15,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { authApi } from '../../../api/auth';
 import { useAuth } from '../../../context/AuthContext';
-import { useFonts, Mali_400Regular, Mali_700Bold } from '@expo-google-fonts/mali';
+import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
 
 const theme = {
   background: '#F5F3E9',
@@ -57,8 +57,6 @@ const FloatingHeart = ({ x, y, onComplete }: { x: number, y: number, onComplete:
 
 export default function LogInScreen() {
   const { login } = useAuth();
-  const [fontsLoaded] = useFonts({ Mali_400Regular, Mali_700Bold });
-
   const [activeTab, setActiveTab] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -142,8 +140,6 @@ export default function LogInScreen() {
       }
     }
   };
-
-  if (!fontsLoaded) return <View style={styles.loadingScreen}><ActivityIndicator size="large" color={theme.primary} /></View>;
 
   const isError = modalConfig.type === 'error';
   const modalIconName = isError ? 'x-circle' : 'check-circle';
@@ -339,13 +335,13 @@ const styles = StyleSheet.create({
   },
   logoIcon: { fontSize: 32 },
   mainTitle: { 
-    fontFamily: 'Mali_700Bold', 
+    fontFamily: FONT_BOLD, 
     fontSize: 28, 
     color: theme.textDark, 
     marginBottom: 4 
   },
   mainSubtitle: { 
-    fontFamily: 'Mali_400Regular', 
+    fontFamily: FONT_REGULAR, 
     fontSize: 14, 
     color: theme.textLight 
   },
@@ -387,12 +383,12 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   tabText: { 
-    fontFamily: 'Mali_400Regular', 
+    fontFamily: FONT_REGULAR, 
     fontSize: 15, 
     color: theme.textLight 
   },
   activeTabText: { 
-    fontFamily: 'Mali_700Bold', 
+    fontFamily: FONT_BOLD, 
     color: theme.textDark 
   },
 
@@ -403,7 +399,7 @@ const styles = StyleSheet.create({
     marginBottom: 20 
   },
   label: { 
-    fontFamily: 'Mali_700Bold', 
+    fontFamily: FONT_BOLD, 
     fontSize: 11, 
     color: theme.textLight, 
     marginBottom: 8,
@@ -411,7 +407,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   input: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     backgroundColor: theme.inputBg,
     borderRadius: 16,
     paddingHorizontal: 18,
@@ -439,7 +435,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   forgotPasswordText: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 13,
     color: theme.textLight,
   },
@@ -460,12 +456,12 @@ const styles = StyleSheet.create({
     backgroundColor: theme.primary 
   },
   roleText: { 
-    fontFamily: 'Mali_400Regular', 
+    fontFamily: FONT_REGULAR, 
     fontSize: 15, 
     color: theme.textLight 
   },
   roleTextActive: { 
-    fontFamily: 'Mali_700Bold', 
+    fontFamily: FONT_BOLD, 
     color: '#FFF' 
   },
 
@@ -483,7 +479,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   submitButtonText: { 
-    fontFamily: 'Mali_700Bold', 
+    fontFamily: FONT_BOLD, 
     color: '#FFFFFF', 
     fontSize: 16 
   },
@@ -525,14 +521,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 22,
     color: theme.textDark,
     marginBottom: 8,
     textAlign: 'center',
   },
   modalMessage: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 15,
     color: theme.textLight,
     textAlign: 'center',
@@ -551,7 +547,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalButtonConfirmText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 15,
     color: '#FFF',
   },

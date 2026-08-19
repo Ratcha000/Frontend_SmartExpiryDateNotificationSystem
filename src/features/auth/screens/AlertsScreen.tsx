@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../../context/AuthContext';
 import apiClient from '../../../api/client';
+import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
 
 const theme = {
   background: '#F9F8F4',
@@ -247,34 +248,34 @@ const styles = StyleSheet.create({
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background },
   container: { flex: 1, backgroundColor: theme.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: 20 },
-  pageTitle: { fontFamily: 'Mali_700Bold', fontSize: 32, color: theme.textDark, marginBottom: 4 },
-  pageSubtitle: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight },
-  markReadText: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight, marginTop: 12 },
+  pageTitle: { fontFamily: FONT_BOLD, fontSize: 32, color: theme.textDark, marginBottom: 4 },
+  pageSubtitle: { fontFamily: FONT_REGULAR, fontSize: 14, color: theme.textLight },
+  markReadText: { fontFamily: FONT_REGULAR, fontSize: 14, color: theme.textLight, marginTop: 12 },
   
   scrollContent: { paddingHorizontal: 20 },
   
   emptyContainer: { alignItems: 'center', marginTop: 80 },
-  emptyText: { fontFamily: 'Mali_700Bold', fontSize: 16, color: theme.textLight },
+  emptyText: { fontFamily: FONT_BOLD, fontSize: 16, color: theme.textLight },
   
   section: { marginBottom: 32 },
-  sectionTitle: { fontFamily: 'Mali_700Bold', fontSize: 11, letterSpacing: 1.5, marginBottom: 12, marginLeft: 4 },
+  sectionTitle: { fontFamily: FONT_BOLD, fontSize: 11, letterSpacing: 1.5, marginBottom: 12, marginLeft: 4 },
   
   card: { backgroundColor: theme.card, borderRadius: 20, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
   cardInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   dot: { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
-  itemName: { fontFamily: 'Mali_700Bold', fontSize: 16, color: theme.textDark, marginBottom: 4 },
-  itemDesc: { fontFamily: 'Mali_400Regular', fontSize: 13, color: theme.textLight },
+  itemName: { fontFamily: FONT_BOLD, fontSize: 16, color: theme.textDark, marginBottom: 4 },
+  itemDesc: { fontFamily: FONT_REGULAR, fontSize: 13, color: theme.textLight },
   
   actionBtn: { width: 44, height: 44, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginLeft: 12 },
   
   modalOverlay: { flex: 1, backgroundColor: 'rgba(74, 54, 35, 0.4)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   modalContainer: { backgroundColor: theme.card, width: '100%', borderRadius: 32, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 15 },
   modalIconBg: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontFamily: 'Mali_700Bold', fontSize: 22, color: theme.textDark, marginBottom: 8, textAlign: 'center' },
-  modalMessage: { fontFamily: 'Mali_400Regular', fontSize: 15, color: theme.textLight, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
+  modalTitle: { fontFamily: FONT_BOLD, fontSize: 22, color: theme.textDark, marginBottom: 8, textAlign: 'center' },
+  modalMessage: { fontFamily: FONT_REGULAR, fontSize: 15, color: theme.textLight, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
   modalButtonGroup: { flexDirection: 'row', width: '100%' },
   modalButtonCancel: { flex: 1, height: 52, backgroundColor: theme.inputBg, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: 12, borderWidth: 1, borderColor: theme.border },
-  modalButtonCancelText: { fontFamily: 'Mali_700Bold', fontSize: 15, color: theme.textLight },
+  modalButtonCancelText: { fontFamily: FONT_BOLD, fontSize: 15, color: theme.textLight },
   modalButtonConfirm: { flex: 1, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  modalButtonConfirmText: { fontFamily: 'Mali_700Bold', fontSize: 15, color: '#FFF' },
+  modalButtonConfirmText: { fontFamily: FONT_BOLD, fontSize: 15, color: '#FFF' },
 });

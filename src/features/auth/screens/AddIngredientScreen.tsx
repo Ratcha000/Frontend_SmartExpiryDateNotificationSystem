@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker'; // 🔴 นำเข้า DatePicker
 import { useAuth } from '../../../context/AuthContext';
 import apiClient from '../../../api/client';
+import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
 
 const theme = {
   background: '#F9F8F4',
@@ -289,7 +290,7 @@ export default function AddIngredientScreen({ navigation }: any) {
               style={[styles.input, { flex: 1, justifyContent: 'center', paddingRight: 50 }]} 
               onPress={() => setShowDatePicker(true)}
             >
-              <Text style={{ fontFamily: 'Mali_400Regular', fontSize: 15, color: expiryDate ? theme.textDark : theme.textLight }}>
+              <Text style={{ fontFamily: FONT_REGULAR, fontSize: 15, color: expiryDate ? theme.textDark : theme.textLight }}>
                 {expiryDate || 'เลือกวันหมดอายุ...'}
               </Text>
             </TouchableOpacity>
@@ -303,7 +304,7 @@ export default function AddIngredientScreen({ navigation }: any) {
           <TouchableOpacity style={styles.suggestedDatePill} onPress={applySuggestedDate}>
             <Feather name="zap" size={14} color={theme.success} style={{ marginRight: 6 }} />
             <Text style={styles.suggestedDateText}>
-              แนะนำสำหรับ {category}: <Text style={{ fontFamily: 'Mali_700Bold' }}>{suggestedDate}</Text> (+{CATEGORY_MAP[category].addDays} วัน)
+              แนะนำสำหรับ {category}: <Text style={{ fontFamily: FONT_BOLD }}>{suggestedDate}</Text> (+{CATEGORY_MAP[category].addDays} วัน)
             </Text>
           </TouchableOpacity>
 
@@ -425,61 +426,61 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 24, paddingTop: 10, paddingBottom: 40 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: 20 },
   backButton: { padding: 4 },
-  headerTitle: { fontFamily: 'Mali_700Bold', fontSize: 20, color: theme.textDark },
+  headerTitle: { fontFamily: FONT_BOLD, fontSize: 20, color: theme.textDark },
   modeToggleContainer: { flexDirection: 'row', backgroundColor: '#E8E6E1', borderRadius: 99, padding: 4, marginBottom: 24 },
   modeButton: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 99 },
   modeButtonActive: { backgroundColor: theme.card, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  modeButtonText: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight },
-  modeButtonTextActive: { fontFamily: 'Mali_700Bold', color: theme.textDark },
+  modeButtonText: { fontFamily: FONT_REGULAR, fontSize: 14, color: theme.textLight },
+  modeButtonTextActive: { fontFamily: FONT_BOLD, color: theme.textDark },
   inputGroup: { marginBottom: 20 },
   rowGroup: { flexDirection: 'row', gap: 16 },
-  label: { fontFamily: 'Mali_700Bold', fontSize: 11, color: theme.textLight, marginBottom: 8, letterSpacing: 1 },
-  input: { fontFamily: 'Mali_400Regular', backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 16, height: 54, fontSize: 15, color: theme.textDark, borderWidth: 1, borderColor: theme.border },
+  label: { fontFamily: FONT_BOLD, fontSize: 11, color: theme.textLight, marginBottom: 8, letterSpacing: 1 },
+  input: { fontFamily: FONT_REGULAR, backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 16, height: 54, fontSize: 15, color: theme.textDark, borderWidth: 1, borderColor: theme.border },
   
   categoryContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   categoryPill: { backgroundColor: theme.inputBg, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: theme.border },
   categoryPillActive: { backgroundColor: theme.primary, borderColor: theme.primary },
-  categoryText: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight },
-  categoryTextActive: { fontFamily: 'Mali_700Bold', color: '#FFF' },
+  categoryText: { fontFamily: FONT_REGULAR, fontSize: 14, color: theme.textLight },
+  categoryTextActive: { fontFamily: FONT_BOLD, color: '#FFF' },
   
   scrollPill: { backgroundColor: theme.inputBg, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: theme.border },
   scrollPillActive: { backgroundColor: theme.primary, borderColor: theme.primary },
-  scrollPillText: { fontFamily: 'Mali_700Bold', fontSize: 13, color: theme.textLight },
+  scrollPillText: { fontFamily: FONT_BOLD, fontSize: 13, color: theme.textLight },
   scrollPillTextActive: { color: '#FFF' },
 
   dropdownHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 16, height: 54, borderWidth: 1, borderColor: theme.border },
   dropdownHeaderActive: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 0 },
-  dropdownHeaderText: { fontFamily: 'Mali_400Regular', fontSize: 15, color: theme.textDark },
+  dropdownHeaderText: { fontFamily: FONT_REGULAR, fontSize: 15, color: theme.textDark },
   dropdownListAbsolute: { position: 'absolute', top: 54, left: 0, right: 0, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderTopWidth: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, zIndex: 9999, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 },
   dropdownItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  dropdownItemText: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight },
-  dropdownItemTextActive: { fontFamily: 'Mali_700Bold', color: theme.primary },
+  dropdownItemText: { fontFamily: FONT_REGULAR, fontSize: 14, color: theme.textLight },
+  dropdownItemTextActive: { fontFamily: FONT_BOLD, color: theme.primary },
   
   inputWithIconContainer: { position: 'relative', justifyContent: 'center' },
   cameraButton: { position: 'absolute', right: 8, backgroundColor: theme.primary, width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   
   suggestedDatePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.successBg, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, marginTop: 12 },
-  suggestedDateText: { fontFamily: 'Mali_400Regular', fontSize: 12, color: theme.success },
+  suggestedDateText: { fontFamily: FONT_REGULAR, fontSize: 12, color: theme.success },
 
   ocrHint: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginLeft: 4 },
-  ocrHintText: { fontFamily: 'Mali_400Regular', fontSize: 12, color: theme.textLight },
+  ocrHintText: { fontFamily: FONT_REGULAR, fontSize: 12, color: theme.textLight },
   
   partsSection: { backgroundColor: '#F3F4F6', padding: 16, borderRadius: 20, marginBottom: 20 },
   partRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   removePartBtn: { padding: 10, marginLeft: 4 },
   addPartBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
-  addPartBtnText: { fontFamily: 'Mali_700Bold', fontSize: 14, color: theme.primary },
+  addPartBtnText: { fontFamily: FONT_BOLD, fontSize: 14, color: theme.primary },
   
   footer: { paddingHorizontal: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 20, paddingTop: 10, backgroundColor: theme.background },
   mainSaveButton: { backgroundColor: theme.primary, height: 56, borderRadius: 99, justifyContent: 'center', alignItems: 'center', shadowColor: theme.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
-  mainSaveButtonText: { fontFamily: 'Mali_700Bold', color: '#FFFFFF', fontSize: 16 },
+  mainSaveButtonText: { fontFamily: FONT_BOLD, color: '#FFFFFF', fontSize: 16 },
   
   modalOverlay: { flex: 1, backgroundColor: 'rgba(74, 54, 35, 0.4)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   modalContainer: { backgroundColor: theme.card, width: '100%', borderRadius: 32, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 15 },
   modalIconBg: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontFamily: 'Mali_700Bold', fontSize: 22, color: theme.textDark, marginBottom: 8, textAlign: 'center' },
-  modalMessage: { fontFamily: 'Mali_400Regular', fontSize: 15, color: theme.textLight, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
+  modalTitle: { fontFamily: FONT_BOLD, fontSize: 22, color: theme.textDark, marginBottom: 8, textAlign: 'center' },
+  modalMessage: { fontFamily: FONT_REGULAR, fontSize: 15, color: theme.textLight, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
   modalButtonGroup: { flexDirection: 'row', width: '100%' },
   modalButtonConfirm: { flex: 1, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  modalButtonConfirmText: { fontFamily: 'Mali_700Bold', fontSize: 15, color: '#FFF' }
+  modalButtonConfirmText: { fontFamily: FONT_BOLD, fontSize: 15, color: '#FFF' }
 });

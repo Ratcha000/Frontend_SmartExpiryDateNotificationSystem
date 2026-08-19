@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../../context/AuthContext';
 import apiClient from '../../../api/client';
+import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
 
 const theme = {
   background: '#F9F8F4',
@@ -406,7 +407,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 16,
     color: theme.textLight,
   },
@@ -416,12 +417,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   pageTitle: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 28,
     color: theme.textDark,
   },
   pageSubtitle: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 14,
     color: theme.textLight,
   },
@@ -443,7 +444,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 15,
     color: theme.textDark,
   },
@@ -472,7 +473,7 @@ const styles = StyleSheet.create({
     borderColor: theme.primary,
   },
   filterText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 13,
     color: theme.textDark,
   },
@@ -480,7 +481,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   filterCount: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 13,
     color: theme.textLight,
     marginLeft: 6,
@@ -520,7 +521,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   itemName: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 16,
     color: theme.textDark,
     marginBottom: 4,
@@ -533,7 +534,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   categoryText: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 11,
     color: theme.textLight,
     textTransform: 'capitalize',
@@ -552,7 +553,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   statusText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 11,
   },
   cardDetails: {
@@ -561,12 +562,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   quantityText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 16,
     color: theme.textDark,
   },
   unitText: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 13,
     color: theme.textLight,
   },
@@ -576,12 +577,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   dateText: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 12,
     color: theme.textLight,
   },
   daysLeftText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 12,
   },
   lowStockAlert: {
@@ -591,7 +592,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   lowStockText: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 12,
     color: theme.nearExpiry,
   },
@@ -645,14 +646,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 22,
     color: theme.textDark,
     marginBottom: 8,
     textAlign: 'center',
   },
   modalMessage: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 15,
     color: theme.textLight,
     textAlign: 'center',
@@ -671,7 +672,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalButtonConfirmText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 15,
     color: '#FFF',
   },
@@ -686,7 +687,7 @@ const styles = StyleSheet.create({
     borderColor: theme.border,
   },
   modalButtonCancelText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 15,
     color: theme.textLight,
   },
@@ -696,14 +697,14 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   editLabel: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 12,
     color: theme.textLight,
     marginBottom: 8,
     textAlign: 'center',
   },
   editInput: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     backgroundColor: theme.inputBg,
     borderRadius: 16,
     borderWidth: 1,

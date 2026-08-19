@@ -13,6 +13,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../../../context/AuthContext';
 import apiClient from '../../../api/client';
+import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
 
 const theme = {
   background: '#F9F8F4',
@@ -256,7 +257,7 @@ export default function IngredientDetailScreen({ route, navigation }: any) {
                 <View style={styles.historyHeader}>
                   <Text style={styles.historyActionText}>
                     {hist.type === 'consume' ? 'Consumed ' : hist.type === 'restock' ? 'Restocked ' : 'Added '}
-                    <Text style={{ fontFamily: 'Mali_700Bold' }}>{hist.amount}</Text>
+                    <Text style={{ fontFamily: FONT_BOLD }}>{hist.amount}</Text>
                   </Text>
                   <Text style={styles.historyTimeText}>{hist.time}</Text>
                 </View>
@@ -373,35 +374,35 @@ const styles = StyleSheet.create({
   circleBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.card, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   
   categoryPill: { backgroundColor: theme.border, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginBottom: 12 },
-  categoryText: { fontFamily: 'Mali_400Regular', fontSize: 12, color: theme.textLight, textTransform: 'capitalize' },
+  categoryText: { fontFamily: FONT_REGULAR, fontSize: 12, color: theme.textLight, textTransform: 'capitalize' },
   
-  itemName: { fontFamily: 'Mali_700Bold', fontSize: 32, color: theme.textDark, marginBottom: 12 },
+  itemName: { fontFamily: FONT_BOLD, fontSize: 32, color: theme.textDark, marginBottom: 12 },
   
   badgeRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
   badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
   badgeDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
-  badgeText: { fontFamily: 'Mali_700Bold', fontSize: 12 },
+  badgeText: { fontFamily: FONT_BOLD, fontSize: 12 },
 
   infoCardsRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   infoCard: { flex: 1, backgroundColor: theme.card, borderRadius: 20, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
-  infoCardLabel: { fontFamily: 'Mali_700Bold', fontSize: 10, color: theme.textLight, letterSpacing: 1, marginBottom: 8 },
-  infoCardValue: { fontFamily: 'Mali_700Bold', fontSize: 24, color: theme.textDark },
-  infoCardSub: { fontFamily: 'Mali_400Regular', fontSize: 12, color: theme.textLight, marginTop: 4, marginBottom: 12 },
+  infoCardLabel: { fontFamily: FONT_BOLD, fontSize: 10, color: theme.textLight, letterSpacing: 1, marginBottom: 8 },
+  infoCardValue: { fontFamily: FONT_BOLD, fontSize: 24, color: theme.textDark },
+  infoCardSub: { fontFamily: FONT_REGULAR, fontSize: 12, color: theme.textLight, marginTop: 4, marginBottom: 12 },
   progressBarBg: { height: 6, backgroundColor: theme.inputBg, borderRadius: 3, overflow: 'hidden' },
   progressBarFill: { height: '100%', backgroundColor: theme.nearExpiry, borderRadius: 3 },
 
   storageCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, borderRadius: 16, padding: 16, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2, gap: 12 },
-  storageText: { fontFamily: 'Mali_400Regular', fontSize: 15, color: theme.textDark },
+  storageText: { fontFamily: FONT_REGULAR, fontSize: 15, color: theme.textDark },
 
   mainActionsRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   mainActionBtn: { flex: 1, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  mainActionText: { fontFamily: 'Mali_700Bold', fontSize: 16 },
+  mainActionText: { fontFamily: FONT_BOLD, fontSize: 16 },
 
   secondaryActionsRow: { flexDirection: 'row', gap: 12, marginBottom: 32 },
   secActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.card, height: 44, borderRadius: 12, borderWidth: 1, borderColor: theme.border, gap: 6 },
-  secActionText: { fontFamily: 'Mali_700Bold', fontSize: 12, color: theme.textDark },
+  secActionText: { fontFamily: FONT_BOLD, fontSize: 12, color: theme.textDark },
 
-  historyTitle: { fontFamily: 'Mali_700Bold', fontSize: 18, color: theme.textDark, marginBottom: 16 },
+  historyTitle: { fontFamily: FONT_BOLD, fontSize: 18, color: theme.textDark, marginBottom: 16 },
   historyContainer: { paddingHorizontal: 4 },
   historyItem: { flexDirection: 'row', marginBottom: 0 },
   historyIconCol: { alignItems: 'center', width: 32, marginRight: 12 },
@@ -409,23 +410,23 @@ const styles = StyleSheet.create({
   historyLine: { width: 1, flex: 1, backgroundColor: theme.border, marginVertical: 4 },
   historyContent: { flex: 1, paddingBottom: 24 },
   historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  historyActionText: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textDark },
-  historyTimeText: { fontFamily: 'Mali_400Regular', fontSize: 11, color: theme.textLight },
-  historyUserText: { fontFamily: 'Mali_400Regular', fontSize: 12, color: theme.textLight },
+  historyActionText: { fontFamily: FONT_REGULAR, fontSize: 14, color: theme.textDark },
+  historyTimeText: { fontFamily: FONT_REGULAR, fontSize: 11, color: theme.textLight },
+  historyUserText: { fontFamily: FONT_REGULAR, fontSize: 12, color: theme.textLight },
 
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(74, 54, 35, 0.4)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   modalContainer: { backgroundColor: theme.card, width: '100%', borderRadius: 32, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 15 },
   modalIconBg: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontFamily: 'Mali_700Bold', fontSize: 22, color: theme.textDark, marginBottom: 8, textAlign: 'center' },
-  modalMessage: { fontFamily: 'Mali_400Regular', fontSize: 15, color: theme.textLight, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
+  modalTitle: { fontFamily: FONT_BOLD, fontSize: 22, color: theme.textDark, marginBottom: 8, textAlign: 'center' },
+  modalMessage: { fontFamily: FONT_REGULAR, fontSize: 15, color: theme.textLight, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
   modalButtonGroup: { flexDirection: 'row', width: '100%' },
   modalButtonCancel: { flex: 1, height: 52, backgroundColor: theme.inputBg, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: 12, borderWidth: 1, borderColor: theme.border },
-  modalButtonCancelText: { fontFamily: 'Mali_700Bold', fontSize: 15, color: theme.textLight },
+  modalButtonCancelText: { fontFamily: FONT_BOLD, fontSize: 15, color: theme.textLight },
   modalButtonConfirm: { flex: 1, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  modalButtonConfirmText: { fontFamily: 'Mali_700Bold', fontSize: 15, color: '#FFF' },
+  modalButtonConfirmText: { fontFamily: FONT_BOLD, fontSize: 15, color: '#FFF' },
 
   editInputWrapper: { width: '100%', marginBottom: 24 },
-  editLabel: { fontFamily: 'Mali_700Bold', fontSize: 12, color: theme.textLight, marginBottom: 8, textAlign: 'center' },
-  editInput: { fontFamily: 'Mali_700Bold', backgroundColor: theme.inputBg, borderRadius: 16, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 16, height: 60, fontSize: 24, color: theme.textDark, textAlign: 'center' },
+  editLabel: { fontFamily: FONT_BOLD, fontSize: 12, color: theme.textLight, marginBottom: 8, textAlign: 'center' },
+  editInput: { fontFamily: FONT_BOLD, backgroundColor: theme.inputBg, borderRadius: 16, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 16, height: 60, fontSize: 24, color: theme.textDark, textAlign: 'center' },
 });

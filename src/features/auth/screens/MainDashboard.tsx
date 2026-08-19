@@ -12,6 +12,7 @@ import AddIngredientScreen from './AddIngredientScreen';
 import AlertsScreen from './AlertsScreen';
 import IngredientDetailScreen from './IngredientDetailScreen';
 import MenuSuggestionsScreen from './MenuSuggestionsScreen';
+import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
@@ -290,7 +291,7 @@ const TeamScreen = () => {
             
             <Text style={styles.modalMessage}>
               {modalConfig.message.includes('คุณต้องการลบ') ? (
-                <>คุณต้องการลบ <Text style={{ fontFamily: 'Mali_700Bold', color: theme.textDark }}>{modalConfig.message.replace('คุณต้องการลบ ', '').replace(' ออกจากทีมใช่หรือไม่?', '')}</Text> ออกจากทีมใช่หรือไม่?</>
+                <>คุณต้องการลบ <Text style={{ fontFamily: FONT_BOLD, color: theme.textDark }}>{modalConfig.message.replace('คุณต้องการลบ ', '').replace(' ออกจากทีมใช่หรือไม่?', '')}</Text> ออกจากทีมใช่หรือไม่?</>
               ) : (
                 modalConfig.message
               )}
@@ -349,7 +350,7 @@ function MainTabNavigator() {
           paddingBottom: Platform.OS === 'ios' ? 25 : 10,
           paddingTop: 10,
         },
-        tabBarLabelStyle: { fontFamily: 'Mali_700Bold', fontSize: 11, marginTop: 4 }
+        tabBarLabelStyle: { fontFamily: FONT_BOLD, fontSize: 11, marginTop: 4 }
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
@@ -375,40 +376,40 @@ const styles = StyleSheet.create({
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background },
   container: { flex: 1, backgroundColor: theme.background },
   scrollContent: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: 40 },
-  title: { fontFamily: 'Mali_700Bold', fontSize: 24, color: theme.textDark },
+  title: { fontFamily: FONT_BOLD, fontSize: 24, color: theme.textDark },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  pageTitle: { fontFamily: 'Mali_700Bold', fontSize: 28, color: theme.textDark },
-  pageSubtitle: { fontFamily: 'Mali_400Regular', fontSize: 16, color: theme.textLight },
+  pageTitle: { fontFamily: FONT_BOLD, fontSize: 28, color: theme.textDark },
+  pageSubtitle: { fontFamily: FONT_REGULAR, fontSize: 16, color: theme.textLight },
   profileIcon: { backgroundColor: theme.textDark, padding: 12, borderRadius: 16 },
   restaurantNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   editIcon: { padding: 4 },
   editNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  nameInput: { flex: 1, backgroundColor: theme.card, fontFamily: 'Mali_400Regular', fontSize: 14, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, color: theme.textDark, borderWidth: 1, borderColor: theme.inputBg },
+  nameInput: { flex: 1, backgroundColor: theme.card, fontFamily: FONT_REGULAR, fontSize: 14, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, color: theme.textDark, borderWidth: 1, borderColor: theme.inputBg },
   iconButton: { padding: 6, backgroundColor: theme.card, borderRadius: 8 },
   noRestaurantContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40, paddingVertical: 100 },
-  noRestaurantTitle: { fontFamily: 'Mali_700Bold', fontSize: 18, color: theme.textDark, textAlign: 'center', marginBottom: 8 },
-  noRestaurantDesc: { fontFamily: 'Mali_400Regular', fontSize: 14, color: theme.textLight, textAlign: 'center' },
+  noRestaurantTitle: { fontFamily: FONT_BOLD, fontSize: 18, color: theme.textDark, textAlign: 'center', marginBottom: 8 },
+  noRestaurantDesc: { fontFamily: FONT_REGULAR, fontSize: 14, color: theme.textLight, textAlign: 'center' },
   statsRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
   statBox: { flex: 1, backgroundColor: theme.card, padding: 16, borderRadius: 16, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
-  statNumber: { fontFamily: 'Mali_700Bold', fontSize: 20, color: theme.textDark },
-  statLabel: { fontFamily: 'Mali_400Regular', fontSize: 12, color: theme.textLight, marginTop: 4 },
+  statNumber: { fontFamily: FONT_BOLD, fontSize: 20, color: theme.textDark },
+  statLabel: { fontFamily: FONT_REGULAR, fontSize: 12, color: theme.textLight, marginTop: 4 },
   section: { marginBottom: 24 },
-  sectionTitle: { fontFamily: 'Mali_700Bold', fontSize: 11, color: theme.textLight, letterSpacing: 1, marginBottom: 12 },
+  sectionTitle: { fontFamily: FONT_BOLD, fontSize: 11, color: theme.textLight, letterSpacing: 1, marginBottom: 12 },
   inviteCard: { flexDirection: 'row', backgroundColor: theme.card, padding: 20, borderRadius: 20, justifyContent: 'space-between', alignItems: 'center' },
   inviteTextWrapper: { flex: 1, paddingRight: 12 }, 
-  inviteCode: { fontFamily: 'Mali_700Bold', fontSize: 22, letterSpacing: 2, color: theme.textDark },
-  inviteDesc: { fontFamily: 'Mali_400Regular', fontSize: 13, color: theme.textLight, marginTop: 4 },
+  inviteCode: { fontFamily: FONT_BOLD, fontSize: 22, letterSpacing: 2, color: theme.textDark },
+  inviteDesc: { fontFamily: FONT_REGULAR, fontSize: 13, color: theme.textLight, marginTop: 4 },
   copyButton: { backgroundColor: theme.inputBg, padding: 12, borderRadius: 12 },
   memberHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   memberCard: { flexDirection: 'row', backgroundColor: theme.card, padding: 16, borderRadius: 16, marginBottom: 12, alignItems: 'center' },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.textDark, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  avatarText: { fontFamily: 'Mali_700Bold', color: '#FFF', fontSize: 16 },
+  avatarText: { fontFamily: FONT_BOLD, color: '#FFF', fontSize: 16 },
   memberInfo: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  memberName: { fontFamily: 'Mali_700Bold', fontSize: 16, color: theme.textDark },
-  memberRoleBadge: { fontFamily: 'Mali_400Regular', fontSize: 11, color: theme.textLight, backgroundColor: theme.inputBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, overflow: 'hidden' },
+  memberName: { fontFamily: FONT_BOLD, fontSize: 16, color: theme.textDark },
+  memberRoleBadge: { fontFamily: FONT_REGULAR, fontSize: 11, color: theme.textLight, backgroundColor: theme.inputBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, overflow: 'hidden' },
   deleteMemberBtn: { padding: 8, backgroundColor: '#FEF2F2', borderRadius: 8 },
   logoutButton: { backgroundColor: theme.danger, padding: 16, borderRadius: 99, alignItems: 'center', marginTop: 10, marginBottom: 20 },
-  logoutButtonText: { fontFamily: 'Mali_700Bold', color: '#FFF', fontSize: 16 },
+  logoutButtonText: { fontFamily: FONT_BOLD, color: '#FFF', fontSize: 16 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(74, 54, 35, 0.4)', 
@@ -437,14 +438,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 22,
     color: theme.textDark,
     marginBottom: 8,
     textAlign: 'center',
   },
   modalMessage: {
-    fontFamily: 'Mali_400Regular',
+    fontFamily: FONT_REGULAR,
     fontSize: 15,
     color: theme.textLight,
     textAlign: 'center',
@@ -465,7 +466,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalButtonCancelText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 15,
     color: theme.textLight,
   },
@@ -478,7 +479,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalButtonConfirmText: {
-    fontFamily: 'Mali_700Bold',
+    fontFamily: FONT_BOLD,
     fontSize: 15,
     color: '#FFF',
   },
