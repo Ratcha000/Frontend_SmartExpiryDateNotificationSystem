@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -169,6 +169,41 @@ export default function InventoryScreen({ navigation }: any) {
     }
   };
 
+  /** จัดกลุ่มรายการตามสถานะความสด เพื่อแสดงเป็นหมวดในลิสต์ */
+  const groupedData = useMemo(() => {
+    const isExpired = (item: any) => item.expired || item.status === 'EXPIRED';
+    const isUsedUp = (item: any) => item.status === 'USED' || item.quantity <= 0;
+
+    const sortByDays = (list: any[]) => [...list].sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0));
+
+    return [
+      {
+        key: 'FRESH',
+        title: 'ยังไม่เสีย',
+        color: theme.fresh,
+        items: sortByDays(filteredData.filter((i) => !isExpired(i) && !i.expiring && !isUsedUp(i))),
+      },
+      {
+        key: 'NEAR',
+        title: 'ใกล้เสีย',
+        color: theme.nearExpiry,
+        items: sortByDays(filteredData.filter((i) => !isExpired(i) && i.expiring && !isUsedUp(i))),
+      },
+      {
+        key: 'EXPIRED',
+        title: 'เสียแล้ว',
+        color: theme.expired,
+        items: sortByDays(filteredData.filter((i) => isExpired(i))),
+      },
+      {
+        key: 'USED',
+        title: 'ใช้หมดแล้ว',
+        color: theme.textLight,
+        items: filteredData.filter((i) => !isExpired(i) && isUsedUp(i)),
+      },
+    ].filter((group) => group.items.length > 0);
+  }, [filteredData]);
+
   const getStatusDisplay = (item: any) => {
     if (item.expired || item.status === 'EXPIRED') {
       return { label: 'Expired', color: theme.expired, bg: theme.expiredBg };
@@ -244,7 +279,15 @@ export default function InventoryScreen({ navigation }: any) {
               <Text style={styles.emptyText}>No ingredients found.</Text>
             </View>
           ) : (
-            filteredData.map((item) => {
+            groupedData.map((group) => (
+              <View key={group.key}>
+                <View style={styles.groupHeader}>
+                  <View style={[styles.groupDot, { backgroundColor: group.color }]} />
+                  <Text style={styles.groupTitle}>{group.title}</Text>
+                  <Text style={styles.groupCount}>{group.items.length}</Text>
+                </View>
+
+                {group.items.map((item: any) => {
               const statusStyle = getStatusDisplay(item);
               const isLowStock = item.quantity <= (item.initialQuantity * 0.20);
               
@@ -299,7 +342,9 @@ export default function InventoryScreen({ navigation }: any) {
                   <Feather name="edit-2" size={20} color={theme.border} style={styles.chevron} />
                 </TouchableOpacity>
               );
-            })
+                })}
+              </View>
+            ))
           )}
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -402,6 +447,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 10 },
+  groupDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+  groupTitle: { flex: 1, fontFamily: FONT_BOLD, fontSize: 14, color: theme.textDark },
+  groupCount: { fontFamily: FONT_BOLD, fontSize: 12, color: theme.textLight },
+
   emptyContainer: {
     paddingTop: 60,
     alignItems: 'center',

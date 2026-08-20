@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,9 @@ import DateTimePicker from '@react-native-community/datetimepicker'; // 🔴 น
 import { useAuth } from '../../../context/AuthContext';
 import apiClient from '../../../api/client';
 import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
+import IngredientPicker from './components/IngredientPicker';
+import PartDropdown from './components/PartDropdown';
+import { getIngredientType, INGREDIENT_TYPES, OTHER_KEY } from './components/ingredientCatalog';
 
 const theme = {
   background: '#F9F8F4',
@@ -50,23 +53,37 @@ export default function AddIngredientScreen({ navigation }: any) {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [addMode, setAddMode] = useState<'SINGLE' | 'BATCH'>('SINGLE');
-  const [name, setName] = useState('');
-  const [lotName, setLotName] = useState('');
-  const [category, setCategory] = useState(CATEGORIES[0]);
+
+  // ประเภทวัตถุดิบที่เลือกจากวงกลม (แทนช่องหมวดหมู่เดิม)
+  const [typeKey, setTypeKey] = useState(INGREDIENT_TYPES[0].key);
+  const selectedType = getIngredientType(typeKey);
+  const isOther = typeKey === OTHER_KEY;
+
+  // กรณีเลือก "อื่นๆ" ผู้ใช้กรอกชื่อและเลือกหมวดหมู่เอง
+  const [otherCategory, setOtherCategory] = useState(CATEGORIES[0]);
+  const [customName, setCustomName] = useState('');
+
+  const category = isOther ? otherCategory : selectedType.category;
+
+  // ชิ้นส่วน/ชนิด สำหรับโหมด Single
+  const [part, setPart] = useState('');
+  // ชื่อที่ผู้ใช้แก้เอง (null = ใช้ชื่อที่ระบบประกอบให้)
+  const [nameOverride, setNameOverride] = useState<string | null>(null);
+
+  const [lotName, setLotName] = useState(INGREDIENT_TYPES[0].label);
+  const [lotNameTouched, setLotNameTouched] = useState(false);
+
   const [quantity, setQuantity] = useState('');
-  const [unit, setUnit] = useState(CATEGORY_MAP[CATEGORIES[0]].units[0]);
-  const [customUnit, setCustomUnit] = useState(''); 
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isCustomUnit, setIsCustomUnit] = useState(false);
-  
+  const [unit, setUnit] = useState(CATEGORY_MAP[INGREDIENT_TYPES[0].category].units[0]);
+
   // State วันหมดอายุ
   const [expiryDate, setExpiryDate] = useState('');
   const [isManualExpiry, setIsManualExpiry] = useState(false);
   const [suggestedDate, setSuggestedDate] = useState('');
-  
+
   // 🔴 State สำหรับเปิด/ปิด ปฏิทิน
   const [showDatePicker, setShowDatePicker] = useState(false);
-  
+
   const [notifyDaysBefore, setNotifyDaysBefore] = useState(NOTIFY_DAYS[1]);
   const [storageLocation, setStorageLocation] = useState(STORAGE_LOCATIONS[0]);
   const [parts, setParts] = useState([{ partName: '', quantity: '' }]);
@@ -86,6 +103,14 @@ export default function AddIngredientScreen({ navigation }: any) {
     setModalConfig(prev => ({ ...prev, visible: false }));
   };
 
+  // ชื่อวัตถุดิบที่จะส่งขึ้น backend (โหมด Single)
+  const composedName = isOther
+    ? customName.trim()
+    : part.trim()
+    ? `${selectedType.label} - ${part.trim()}`
+    : selectedType.label;
+  const finalName = nameOverride !== null ? nameOverride.trim() : composedName;
+
   // คำนวณวันหมดอายุแนะนำ
   const calculateSuggestedDate = (daysToAdd: number) => {
     const date = new Date();
@@ -96,19 +121,28 @@ export default function AddIngredientScreen({ navigation }: any) {
   useEffect(() => {
     const catInfo = CATEGORY_MAP[category];
     setUnit(catInfo.units[0]);
-    setIsCustomUnit(false);
-    setCustomUnit('');
-    setIsDropdownOpen(false);
 
     // คำนวณวันหมดอายุใหม่เมื่อเปลี่ยนหมวดหมู่
     const newSuggestedDate = calculateSuggestedDate(catInfo.addDays);
     setSuggestedDate(newSuggestedDate);
-    
+
     // ถ้าผู้ใช้ยังไม่เคยจิ้มเลือกปฏิทินเอง ให้ระบบเปลี่ยนให้เลย
     if (!isManualExpiry) {
       setExpiryDate(newSuggestedDate);
     }
   }, [category]);
+
+  /** เลือกวงกลมวัตถุดิบ */
+  const handleSelectType = (type: typeof INGREDIENT_TYPES[number]) => {
+    setTypeKey(type.key);
+    setPart('');
+    setNameOverride(null);
+    setParts([{ partName: '', quantity: '' }]);
+    // เติมชื่อล็อตให้อัตโนมัติ ถ้าผู้ใช้ยังไม่ได้พิมพ์เอง
+    if (!lotNameTouched) {
+      setLotName(type.key === OTHER_KEY ? '' : type.label);
+    }
+  };
 
   // 🔴 ฟังก์ชันจัดการเมื่อเลือกวันที่จากปฏิทินเสร็จ
   const handleDateChange = (event: any, selectedDate?: Date) => {
@@ -140,48 +174,71 @@ export default function AddIngredientScreen({ navigation }: any) {
     setParts(newParts);
   };
 
+  // ชิ้นส่วนที่ยังไม่ถูกเลือกในแถวอื่น (กันเพิ่มซ้ำ)
+  const availableParts = useMemo(
+    () =>
+      parts.map((_, index) =>
+        selectedType.parts.filter(
+          (option) => !parts.some((p, i) => i !== index && p.partName === option)
+        )
+      ),
+    [parts, selectedType]
+  );
+
   const handleSave = async () => {
     if (!user?.restaurantId) return showModal('error', 'ข้อผิดพลาด', 'ไม่พบข้อมูลร้านค้า กรุณาล็อกอินใหม่');
-    
-    if (addMode === 'SINGLE' && (!name || !quantity)) return showModal('error', 'ข้อมูลไม่ครบ', 'กรุณากรอกชื่อวัตถุดิบและปริมาณให้ครบ');
-    if (addMode === 'BATCH' && (!lotName || parts.some(p => !p.partName || !p.quantity))) return showModal('error', 'ข้อมูลไม่ครบ', 'กรุณากรอกชื่อ Lot และชิ้นส่วนให้ครบ');
-    if (!expiryDate) return showModal('error', 'ข้อมูลไม่ครบ', 'กรุณากรอกวันหมดอายุ (YYYY-MM-DD)');
-    if (isCustomUnit && !customUnit.trim()) return showModal('error', 'ข้อผิดพลาด', 'กรุณาระบุหน่วยที่กำหนดเอง');
 
-    const finalUnit = isCustomUnit ? customUnit.trim() : unit;
+    if (addMode === 'SINGLE') {
+      if (!finalName) return showModal('error', 'ข้อมูลไม่ครบ', 'กรุณาระบุชื่อวัตถุดิบ');
+      const qty = parseFloat(quantity);
+      if (isNaN(qty) || qty <= 0) return showModal('error', 'ข้อมูลไม่ถูกต้อง', 'กรุณากรอกจำนวนที่มากกว่า 0');
+    } else {
+      if (!lotName.trim()) return showModal('error', 'ข้อมูลไม่ครบ', 'กรุณาระบุชื่อล็อตวัตถุดิบ');
+      const hasInvalidPart = parts.some(
+        (p) => !p.partName.trim() || isNaN(parseFloat(p.quantity)) || parseFloat(p.quantity) <= 0
+      );
+      if (hasInvalidPart) {
+        return showModal('error', 'ข้อมูลไม่ครบ', `กรุณาเลือก${selectedType.partLabel}และกรอกจำนวนที่มากกว่า 0 ให้ครบทุกแถว`);
+      }
+    }
+
+    if (!expiryDate) return showModal('error', 'ข้อมูลไม่ครบ', 'กรุณากรอกวันหมดอายุ (YYYY-MM-DD)');
+    if (!unit.trim()) return showModal('error', 'ข้อผิดพลาด', 'กรุณาระบุหน่วย');
+
+    const finalUnit = unit.trim();
 
     setIsLoading(true);
     try {
       if (addMode === 'SINGLE') {
         const payload = {
           restaurantId: user.restaurantId,
-          name,
-          category: category, 
+          name: finalName,
+          category: category,
           initialQuantity: parseFloat(quantity),
           quantity: parseFloat(quantity),
           unit: finalUnit,
           categoryUnitHint: finalUnit,
           expiryDate,
           notifyDaysBefore: parseInt(notifyDaysBefore, 10),
-          storageLocation 
+          storageLocation
         };
         await apiClient.post('/ingredients', payload);
       } else {
         const items = parts.map(p => ({
-          partName: p.partName,
+          partName: p.partName.trim(),
           initialQuantity: parseFloat(p.quantity),
           quantity: parseFloat(p.quantity),
         }));
-        
+
         const payload = {
           restaurantId: user.restaurantId,
-          lotName,
+          lotName: lotName.trim(),
           category: category,
           unit: finalUnit,
           categoryUnitHint: finalUnit,
           expiryDate,
           notifyDaysBefore: parseInt(notifyDaysBefore, 10),
-          storageLocation, 
+          storageLocation,
           items,
         };
         await apiClient.post('/ingredients/batch', payload);
@@ -219,27 +276,97 @@ export default function AddIngredientScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{addMode === 'SINGLE' ? 'ชื่อวัตถุดิบ' : 'ชื่อล็อควัตถุดิบ'}</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={addMode === 'SINGLE' ? "e.g. แซลมอนนอร์เวย์" : "e.g. เนื้อหมูยกแผง"}
-            placeholderTextColor={theme.textLight}
-            value={addMode === 'SINGLE' ? name : lotName}
-            onChangeText={addMode === 'SINGLE' ? setName : setLotName}
+        {/* วงกลมเลือกวัตถุดิบ แทนช่องหมวดหมู่เดิม */}
+        <View style={[styles.inputGroup, { zIndex: 1 }]}>
+          <Text style={styles.label}>เลือกวัตถุดิบ</Text>
+          <IngredientPicker
+            selectedKey={typeKey}
+            onSelect={handleSelectType}
+            edgePadding={24}
+            theme={theme}
           />
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>หมวดหมู่</Text>
-          <View style={styles.categoryContainer}>
-            {CATEGORIES.map((cat) => (
-              <TouchableOpacity key={cat} style={[styles.categoryPill, category === cat ? styles.categoryPillActive : undefined]} onPress={() => setCategory(cat)}>
-                <Text style={[styles.categoryText, category === cat ? styles.categoryTextActive : undefined]}>{cat}</Text>
-              </TouchableOpacity>
-            ))}
+        {/* เลือก "อื่นๆ" -> ต้องระบุหมวดหมู่เอง เพื่อให้ backend ยังกรองหมวดได้ */}
+        {isOther ? (
+          <View style={[styles.inputGroup, { zIndex: 1 }]}>
+            <Text style={styles.label}>หมวดหมู่</Text>
+            <View style={styles.categoryContainer}>
+              {CATEGORIES.map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.categoryPill, otherCategory === cat ? styles.categoryPillActive : undefined]}
+                  onPress={() => setOtherCategory(cat)}
+                >
+                  <Text style={[styles.categoryText, otherCategory === cat ? styles.categoryTextActive : undefined]}>{cat}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
+        ) : null}
+
+        {addMode === 'SINGLE' ? (
+          <View style={[styles.inputGroup, { zIndex: 3000 }]}>
+            <Text style={styles.label}>{isOther ? 'ชื่อวัตถุดิบ' : selectedType.partLabel}</Text>
+
+            {isOther ? (
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. แซลมอนนอร์เวย์"
+                placeholderTextColor={theme.textLight}
+                value={customName}
+                onChangeText={setCustomName}
+              />
+            ) : (
+              <PartDropdown
+                key={typeKey}
+                options={selectedType.parts}
+                value={part}
+                onChange={(value) => { setPart(value); setNameOverride(null); }}
+                placeholder={`เลือก${selectedType.partLabel}...`}
+                customPlaceholder={`ระบุ${selectedType.partLabel}...`}
+                theme={theme}
+              />
+            )}
+
+            {/* ชื่อที่จะบันทึกจริง แก้เองได้ */}
+            {!isOther ? (
+              nameOverride === null ? (
+                <TouchableOpacity style={styles.namePreview} onPress={() => setNameOverride(composedName)}>
+                  <Text style={styles.namePreviewText} numberOfLines={1}>
+                    ชื่อที่จะบันทึก: <Text style={{ fontFamily: FONT_BOLD }}>{composedName}</Text>
+                  </Text>
+                  <Feather name="edit-2" size={14} color={theme.textLight} />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.nameEditRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 1 }]}
+                    value={nameOverride}
+                    onChangeText={setNameOverride}
+                    placeholder="ชื่อวัตถุดิบ"
+                    placeholderTextColor={theme.textLight}
+                    autoFocus
+                  />
+                  <TouchableOpacity style={styles.nameResetBtn} onPress={() => setNameOverride(null)}>
+                    <Feather name="rotate-ccw" size={18} color={theme.textLight} />
+                  </TouchableOpacity>
+                </View>
+              )
+            ) : null}
+          </View>
+        ) : (
+          <View style={[styles.inputGroup, { zIndex: 1 }]}>
+            <Text style={styles.label}>ชื่อล็อควัตถุดิบ</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. เนื้อหมูยกแผง"
+              placeholderTextColor={theme.textLight}
+              value={lotName}
+              onChangeText={(value) => { setLotName(value); setLotNameTouched(true); }}
+            />
+          </View>
+        )}
 
         <View style={[styles.rowGroup, { zIndex: 1000 }]}>
           {addMode === 'SINGLE' ? (
@@ -251,32 +378,15 @@ export default function AddIngredientScreen({ navigation }: any) {
 
           <View style={[styles.inputGroup, { flex: addMode === 'SINGLE' ? 1.5 : 1, zIndex: 1000 }]}>
             <Text style={styles.label}>หน่วย</Text>
-            <View style={{ position: 'relative', zIndex: 1000 }}>
-              <TouchableOpacity style={[styles.dropdownHeader, isDropdownOpen ? styles.dropdownHeaderActive : undefined]} onPress={() => setIsDropdownOpen(!isDropdownOpen)} activeOpacity={0.7}>
-                <Text style={[styles.dropdownHeaderText, (!unit && !isCustomUnit) ? { color: theme.textLight } : undefined]}>
-                  {isCustomUnit ? 'กำหนดเอง' : (unit || 'เลือกหน่วย')}
-                </Text>
-                <Feather name={isDropdownOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.textLight} />
-              </TouchableOpacity>
-
-              {isDropdownOpen ? (
-                <View style={styles.dropdownListAbsolute}>
-                  {CATEGORY_MAP[category].units.map((u) => (
-                    <TouchableOpacity key={u} style={styles.dropdownItem} onPress={() => { setUnit(u); setIsCustomUnit(false); setIsDropdownOpen(false); }}>
-                      <Text style={[styles.dropdownItemText, unit === u && !isCustomUnit ? styles.dropdownItemTextActive : undefined]}>{u}</Text>
-                      {unit === u && !isCustomUnit ? (<Feather name="check" size={16} color={theme.primary} />) : null}
-                    </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity style={[styles.dropdownItem, { borderBottomWidth: 0 }]} onPress={() => { setIsCustomUnit(true); setUnit(''); setIsDropdownOpen(false); }}>
-                    <Text style={[styles.dropdownItemText, isCustomUnit ? styles.dropdownItemTextActive : undefined]}>กำหนดเอง</Text>
-                    {isCustomUnit ? (<Feather name="check" size={16} color={theme.primary} />) : null}
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-            </View>
-            {isCustomUnit ? (
-              <TextInput style={[styles.input, { height: 44, marginTop: 8 }]} placeholder="ระบุหน่วย..." placeholderTextColor={theme.textLight} value={customUnit} onChangeText={setCustomUnit} autoFocus />
-            ) : null}
+            <PartDropdown
+              key={category}
+              options={CATEGORY_MAP[category].units}
+              value={unit}
+              onChange={setUnit}
+              placeholder="เลือกหน่วย"
+              customPlaceholder="ระบุหน่วย..."
+              theme={theme}
+            />
           </View>
         </View>
 
@@ -284,10 +394,10 @@ export default function AddIngredientScreen({ navigation }: any) {
         <View style={[styles.inputGroup, { zIndex: 1 }]}>
           <Text style={styles.label}>วันหมดอายุ (YYYY-MM-DD)</Text>
           <View style={styles.inputWithIconContainer}>
-            
+
             {/* เปลี่ยนเป็นปุ่มกดเพื่อเปิดปฏิทิน */}
-            <TouchableOpacity 
-              style={[styles.input, { flex: 1, justifyContent: 'center', paddingRight: 50 }]} 
+            <TouchableOpacity
+              style={[styles.input, { flex: 1, justifyContent: 'center', paddingRight: 50 }]}
               onPress={() => setShowDatePicker(true)}
             >
               <Text style={{ fontFamily: FONT_REGULAR, fontSize: 15, color: expiryDate ? theme.textDark : theme.textLight }}>
@@ -299,7 +409,7 @@ export default function AddIngredientScreen({ navigation }: any) {
               <Feather name="camera" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
-          
+
           {/* ป้ายแนะนำวันหมดอายุ (โชว์ตลอดเวลา) */}
           <TouchableOpacity style={styles.suggestedDatePill} onPress={applySuggestedDate}>
             <Feather name="zap" size={14} color={theme.success} style={{ marginRight: 6 }} />
@@ -328,9 +438,9 @@ export default function AddIngredientScreen({ navigation }: any) {
           <Text style={styles.label}>ที่จัดเก็บ</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -24 }} contentContainerStyle={{ paddingHorizontal: 24, gap: 10 }}>
             {STORAGE_LOCATIONS.map((loc) => (
-              <TouchableOpacity 
-                key={loc} 
-                style={[styles.scrollPill, storageLocation === loc ? styles.scrollPillActive : undefined]} 
+              <TouchableOpacity
+                key={loc}
+                style={[styles.scrollPill, storageLocation === loc ? styles.scrollPillActive : undefined]}
                 onPress={() => setStorageLocation(loc)}
               >
                 <Text style={[styles.scrollPillText, storageLocation === loc ? styles.scrollPillTextActive : undefined]}>{loc}</Text>
@@ -342,27 +452,27 @@ export default function AddIngredientScreen({ navigation }: any) {
         {/* 🔴 Par Level (แยกบรรทัดมาเดี่ยวๆ) */}
         <View style={[styles.inputGroup, { zIndex: 1 }]}>
           <Text style={styles.label}>ปริมาณขั้นต่ำที่ต้องมี</Text>
-          <TextInput 
-            style={[styles.input, { backgroundColor: '#F3F4F6', color: theme.textLight }]} 
-            placeholder="ระบบคำนวณให้อัตโนมัติ (20% ของเริ่มต้น)" 
-            placeholderTextColor={theme.textLight} 
-            editable={false} 
+          <TextInput
+            style={[styles.input, { backgroundColor: '#F3F4F6', color: theme.textLight }]}
+            placeholder="ระบบคำนวณให้อัตโนมัติ (20% ของเริ่มต้น)"
+            placeholderTextColor={theme.textLight}
+            editable={false}
           />
         </View>
 
         {/* 🔴 แจ้งเตือนล่วงหน้า (แยกบรรทัด ให้เลื่อนแนวนอนได้ยาวๆ เต็มจอ) */}
         <View style={[styles.inputGroup, { zIndex: 1 }]}>
           <Text style={styles.label}>แจ้งเตือนล่วงหน้าก่อนหมดอายุ</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
-            style={{ marginHorizontal: -24 }} 
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginHorizontal: -24 }}
             contentContainerStyle={{ paddingHorizontal: 24, gap: 10 }}
           >
             {NOTIFY_DAYS.map((days) => (
-              <TouchableOpacity 
-                key={days} 
-                style={[styles.scrollPill, notifyDaysBefore === days ? styles.scrollPillActive : undefined]} 
+              <TouchableOpacity
+                key={days}
+                style={[styles.scrollPill, notifyDaysBefore === days ? styles.scrollPillActive : undefined]}
                 onPress={() => setNotifyDaysBefore(days)}
               >
                 <Text style={[styles.scrollPillText, notifyDaysBefore === days ? styles.scrollPillTextActive : undefined]}>{days} วัน</Text>
@@ -370,15 +480,31 @@ export default function AddIngredientScreen({ navigation }: any) {
             ))}
           </ScrollView>
         </View>
-        
 
         {addMode === 'BATCH' ? (
           <View style={styles.partsSection}>
-            <Text style={styles.label}>PARTS (ชิ้นส่วนที่แยก)</Text>
-            {parts.map((part, index) => (
-              <View key={index} style={styles.partRow}>
-                <TextInput style={[styles.input, { flex: 2, marginRight: 10 }]} placeholder="e.g. สันคอ" placeholderTextColor={theme.textLight} value={part.partName} onChangeText={(val) => handlePartChange(index, 'partName', val)} />
-                <TextInput style={[styles.input, { flex: 1 }]} placeholder="Qty" placeholderTextColor={theme.textLight} keyboardType="numeric" value={part.quantity} onChangeText={(val) => handlePartChange(index, 'quantity', val)} />
+            <Text style={styles.label}>{selectedType.partLabel.toUpperCase()} (ที่แยกในล็อตนี้)</Text>
+            {parts.map((partRow, index) => (
+              <View key={index} style={[styles.partRow, { zIndex: 900 - index * 10 }]}>
+                <View style={{ flex: 2, marginRight: 10 }}>
+                  <PartDropdown
+                    key={`${typeKey}-${index}`}
+                    options={availableParts[index] || []}
+                    value={partRow.partName}
+                    onChange={(value) => handlePartChange(index, 'partName', value)}
+                    placeholder={`เลือก${selectedType.partLabel}...`}
+                    customPlaceholder={`ระบุ${selectedType.partLabel}...`}
+                    theme={theme}
+                  />
+                </View>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="Qty"
+                  placeholderTextColor={theme.textLight}
+                  keyboardType="numeric"
+                  value={partRow.quantity}
+                  onChangeText={(val) => handlePartChange(index, 'quantity', val)}
+                />
                 {parts.length > 1 ? (
                   <TouchableOpacity onPress={() => handleRemovePart(index)} style={styles.removePartBtn}>
                     <Feather name="trash-2" size={20} color={theme.danger} />
@@ -390,6 +516,9 @@ export default function AddIngredientScreen({ navigation }: any) {
               <Feather name="plus" size={16} color={theme.primary} style={{ marginRight: 6 }} />
               <Text style={styles.addPartBtnText}>Add Another Part</Text>
             </TouchableOpacity>
+            <Text style={styles.batchHint}>
+              ชื่อที่บันทึกจะเป็น "{lotName || 'ชื่อล็อต'} - {parts[0]?.partName || selectedType.partLabel}"
+            </Text>
           </View>
         ) : null}
         <View style={{ height: 40 }}></View>
@@ -436,45 +565,43 @@ const styles = StyleSheet.create({
   rowGroup: { flexDirection: 'row', gap: 16 },
   label: { fontFamily: FONT_BOLD, fontSize: 11, color: theme.textLight, marginBottom: 8, letterSpacing: 1 },
   input: { fontFamily: FONT_REGULAR, backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 16, height: 54, fontSize: 15, color: theme.textDark, borderWidth: 1, borderColor: theme.border },
-  
+
+  namePreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.successBg, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginTop: 10 },
+  namePreviewText: { flex: 1, fontFamily: FONT_REGULAR, fontSize: 12, color: theme.textDark, marginRight: 8 },
+  nameEditRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  nameResetBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+
   categoryContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   categoryPill: { backgroundColor: theme.inputBg, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: theme.border },
   categoryPillActive: { backgroundColor: theme.primary, borderColor: theme.primary },
   categoryText: { fontFamily: FONT_REGULAR, fontSize: 14, color: theme.textLight },
   categoryTextActive: { fontFamily: FONT_BOLD, color: '#FFF' },
-  
+
   scrollPill: { backgroundColor: theme.inputBg, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: theme.border },
   scrollPillActive: { backgroundColor: theme.primary, borderColor: theme.primary },
   scrollPillText: { fontFamily: FONT_BOLD, fontSize: 13, color: theme.textLight },
   scrollPillTextActive: { color: '#FFF' },
 
-  dropdownHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 16, paddingHorizontal: 16, height: 54, borderWidth: 1, borderColor: theme.border },
-  dropdownHeaderActive: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 0 },
-  dropdownHeaderText: { fontFamily: FONT_REGULAR, fontSize: 15, color: theme.textDark },
-  dropdownListAbsolute: { position: 'absolute', top: 54, left: 0, right: 0, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderTopWidth: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, zIndex: 9999, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 },
-  dropdownItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  dropdownItemText: { fontFamily: FONT_REGULAR, fontSize: 14, color: theme.textLight },
-  dropdownItemTextActive: { fontFamily: FONT_BOLD, color: theme.primary },
-  
   inputWithIconContainer: { position: 'relative', justifyContent: 'center' },
   cameraButton: { position: 'absolute', right: 8, backgroundColor: theme.primary, width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  
+
   suggestedDatePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.successBg, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, marginTop: 12 },
   suggestedDateText: { fontFamily: FONT_REGULAR, fontSize: 12, color: theme.success },
 
   ocrHint: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginLeft: 4 },
   ocrHintText: { fontFamily: FONT_REGULAR, fontSize: 12, color: theme.textLight },
-  
+
   partsSection: { backgroundColor: '#F3F4F6', padding: 16, borderRadius: 20, marginBottom: 20 },
-  partRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  partRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
   removePartBtn: { padding: 10, marginLeft: 4 },
   addPartBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
   addPartBtnText: { fontFamily: FONT_BOLD, fontSize: 14, color: theme.primary },
-  
+  batchHint: { fontFamily: FONT_REGULAR, fontSize: 11, color: theme.textLight, textAlign: 'center', marginTop: 4 },
+
   footer: { paddingHorizontal: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 20, paddingTop: 10, backgroundColor: theme.background },
   mainSaveButton: { backgroundColor: theme.primary, height: 56, borderRadius: 99, justifyContent: 'center', alignItems: 'center', shadowColor: theme.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   mainSaveButtonText: { fontFamily: FONT_BOLD, color: '#FFFFFF', fontSize: 16 },
-  
+
   modalOverlay: { flex: 1, backgroundColor: 'rgba(74, 54, 35, 0.4)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   modalContainer: { backgroundColor: theme.card, width: '100%', borderRadius: 32, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 15 },
   modalIconBg: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
