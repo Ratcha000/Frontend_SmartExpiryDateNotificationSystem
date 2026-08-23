@@ -12,6 +12,11 @@ import AddIngredientScreen from './AddIngredientScreen';
 import AlertsScreen from './AlertsScreen';
 import IngredientDetailScreen from './IngredientDetailScreen';
 import MenuSuggestionsScreen from './MenuSuggestionsScreen';
+import ScanExpiryScreen from './ScanExpiryScreen';
+import PurchasePlanningScreen from './PurchasePlanningScreen';
+import PurchaseSettingsScreen from './PurchaseSettingsScreen';
+import PurchaseRunHistoryScreen from './PurchaseRunHistoryScreen';
+import PurchaseRunDetailScreen from './PurchaseRunDetailScreen';
 import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -324,7 +329,22 @@ const TeamScreen = () => {
   );
 };
 
-function MainTabNavigator() {
+/* ปุ่มสแกน AI ตรงกลาง Tab Bar ให้เด่นกว่าปุ่มอื่น */
+function ScanTabButton({ onPress }: any) {
+  return (
+    <View style={styles.scanTabWrapper}>
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.scanTabButton}>
+        <Feather name="maximize" size={26} color="#FFF" />
+      </TouchableOpacity>
+      <Text style={styles.scanTabLabel}>Scan</Text>
+    </View>
+  );
+}
+
+/* Placeholder ของแท็บกลาง — ไม่ถูกเรนเดอร์จริง เพราะเรา navigate ไป ScanExpiry แทน */
+const ScanPlaceholder = () => null;
+
+function MainTabNavigator({ navigation }: any) {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -333,7 +353,7 @@ function MainTabNavigator() {
           let iconName: any = 'home';
           if (route.name === 'Home') iconName = 'home';
           else if (route.name === 'Inventory') iconName = 'box';
-          else if (route.name === 'Notifications') iconName = 'bell'; 
+          else if (route.name === 'MenuAI') iconName = 'zap';
           else if (route.name === 'Team') iconName = 'users';
           return <Feather name={iconName} size={24} color={color} />;
         },
@@ -355,7 +375,26 @@ function MainTabNavigator() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Inventory" component={InventoryScreen} />
-      <Tab.Screen name="Notifications" component={AlertsScreen} />
+      <Tab.Screen
+        name="Scan"
+        component={ScanPlaceholder}
+        options={{
+          tabBarButton: (props) => (
+            <ScanTabButton onPress={() => navigation.navigate('ScanExpiry')} />
+          ),
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate('ScanExpiry');
+          },
+        }}
+      />
+      <Tab.Screen
+        name="MenuAI"
+        component={MenuSuggestionsScreen}
+        options={{ tabBarLabel: 'Menu AI' }}
+      />
       <Tab.Screen name="Team" component={TeamScreen} />
     </Tab.Navigator>
   );
@@ -368,11 +407,34 @@ export default function MainDashboard() {
       <Stack.Screen name="AddIngredient" component={AddIngredientScreen} />
       <Stack.Screen name="IngredientDetail" component={IngredientDetailScreen} />
       <Stack.Screen name="MenuSuggestions" component={MenuSuggestionsScreen} />
+      <Stack.Screen name="ScanExpiry" component={ScanExpiryScreen} />
+      <Stack.Screen name="Notifications" component={AlertsScreen} />
+      <Stack.Screen name="PurchasePlanning" component={PurchasePlanningScreen} />
+      <Stack.Screen name="PurchaseSettings" component={PurchaseSettingsScreen} />
+      <Stack.Screen name="PurchaseRunHistory" component={PurchaseRunHistoryScreen} />
+      <Stack.Screen name="PurchaseRunDetail" component={PurchaseRunDetailScreen} />
     </Stack.Navigator>
   );
 }
 
 const styles = StyleSheet.create({
+  scanTabWrapper: { flex: 1, alignItems: 'center', justifyContent: 'flex-start', top: -18 },
+  scanTabButton: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: theme.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: theme.card,
+    shadowColor: theme.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  scanTabLabel: { fontFamily: FONT_BOLD, fontSize: 11, color: theme.primary, marginTop: 4 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background },
   container: { flex: 1, backgroundColor: theme.background },
   scrollContent: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: 40 },

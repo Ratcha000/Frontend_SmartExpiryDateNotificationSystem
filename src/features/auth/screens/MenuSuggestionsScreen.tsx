@@ -538,9 +538,13 @@ export default function MenuSuggestionsScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Feather name="chevron-left" size={24} color={theme.textDark} />
-        </TouchableOpacity>
+        {navigation.canGoBack() ? (
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Feather name="chevron-left" size={24} color={theme.textDark} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backBtn} />
+        )}
         <Text style={styles.headerTitle}>ไอเดียเมนูจาก AI</Text>
         {activeTab === 'URGENT' ? (
           <TouchableOpacity
@@ -657,7 +661,7 @@ const styles = StyleSheet.create({
   tabText: { fontFamily: FONT, fontSize: 13, color: theme.textLight },
   tabTextActive: { fontFamily: FONT_BOLD, color: theme.textDark },
 
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 100 },
 
   loadingContainer: { alignItems: 'center', paddingVertical: 40 },
   loadingText: {

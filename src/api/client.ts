@@ -98,6 +98,13 @@ apiClient.interceptors.response.use(
       console.log(`>>> [NETWORK] รายละเอียด: ${error.message}`);
     }
 
+    // โชว์รายละเอียดที่ backend ส่งกลับมา ไม่งั้นเห็นแค่ "status code 4xx" แล้วเดาไม่ออกว่าพังตรงไหน
+    if (error.response) {
+      const { status, config, data } = error.response;
+      console.log(`\n>>> [NETWORK] ❌ ${status} ${config?.method?.toUpperCase()} ${config?.url}`);
+      console.log('>>> [NETWORK] body ที่ backend ตอบกลับ:', JSON.stringify(data));
+    }
+
     // ถ้าโดนเตะ 401 (หมดอายุ) ให้ล้างข้อมูล
     if (error.response && error.response.status === 401) {
       setGlobalToken(null);

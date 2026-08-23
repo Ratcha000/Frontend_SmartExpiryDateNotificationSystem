@@ -14,7 +14,11 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../../context/AuthContext';
 import apiClient from '../../../api/client';
+import { getNotifications, markNotificationRead } from '../../../api/notifications';
+import { deleteIngredient } from '../../../api/ingredients';
+import type { AppNotification } from '../../../types';
 import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
+import { formatRelativeTime } from './components/purchase/purchaseUtils';
 
 const theme = {
   background: '#F9F8F4',
@@ -36,6 +40,7 @@ export default function AlertsScreen({ navigation }: any) {
   const { user } = useAuth();
   const isManager = user?.role === 'MANAGER';
   
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [expiredItems, setExpiredItems] = useState<any[]>([]);
   const [expiringItems, setExpiringItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,6 +61,17 @@ export default function AlertsScreen({ navigation }: any) {
 
   const closeModal = () => setModalConfig(prev => ({ ...prev, visible: false }));
 
+  /** แจ้งเตือนจริงจาก backend (scheduler สร้างให้ Manager ตอนถึงรอบซื้อของ) */
+  const fetchNotifications = async () => {
+    try {
+      const res = await getNotifications();
+      setNotifications(res.data || []);
+    } catch (error) {
+      // ไม่ให้ล้มทั้งหน้า — ส่วนวัตถุดิบใกล้หมดอายุด้านล่างยังใช้งานได้
+      console.log('Error fetching notifications:', error);
+    }
+  };
+
   const fetchAlerts = async () => {
     if (!user?.restaurantId) return;
     try {
@@ -75,13 +91,43 @@ export default function AlertsScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       fetchAlerts();
+      fetchNotifications();
     }, [user])
   );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchAlerts();
+    fetchNotifications();
   }, []);
+
+  /** แตะแจ้งเตือน 1 ใบ -> mark read แบบ optimistic แล้วพาไปหน้าแผนซื้อของ */
+  const handleNotificationPress = async (item: AppNotification) => {
+    if (!item.read) {
+      setNotifications(prev => prev.map(n => (n.id === item.id ? { ...n, read: true } : n)));
+      try {
+        await markNotificationRead(item.id);
+      } catch (error) {
+        console.log('Error marking notification read:', error);
+        setNotifications(prev => prev.map(n => (n.id === item.id ? { ...n, read: false } : n)));
+      }
+    }
+    if (item.type === 'PURCHASE_RECOMMENDATION') {
+      navigation.navigate('PurchasePlanning');
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    const unread = notifications.filter(n => !n.read);
+    if (unread.length === 0) return;
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    try {
+      await Promise.all(unread.map(n => markNotificationRead(n.id)));
+    } catch (error) {
+      console.log('Error marking all notifications read:', error);
+      fetchNotifications();
+    }
+  };
 
   const handleDeletePress = (item: any) => {
     if (!isManager) {
@@ -101,7 +147,7 @@ export default function AlertsScreen({ navigation }: any) {
     if (!itemToDelete) return;
     setIsLoading(true);
     try {
-      await apiClient.delete(`/ingredients/${itemToDelete.id}`);
+      await deleteIngredient(itemToDelete.id);
       closeModal();
       setItemToDelete(null);
       fetchAlerts(); 
@@ -120,7 +166,9 @@ export default function AlertsScreen({ navigation }: any) {
     );
   }
 
+  const unreadCount = notifications.filter(n => !n.read).length;
   const totalNotifications = expiredItems.length + expiringItems.length;
+  const hasAnything = totalNotifications + notifications.length > 0;
 
   return (
     <View style={styles.container}>
@@ -128,11 +176,11 @@ export default function AlertsScreen({ navigation }: any) {
         <View>
           <Text style={styles.pageTitle}>Notifications</Text>
           <Text style={styles.pageSubtitle}>
-            {totalNotifications} รายการที่ยังไม่ได้อ่าน
+            {unreadCount + totalNotifications} รายการที่ยังไม่ได้อ่าน
           </Text>
         </View>
-        <TouchableOpacity>
-          <Text style={styles.markReadText}>อ่านทั้งหมด</Text>
+        <TouchableOpacity onPress={handleMarkAllRead} disabled={unreadCount === 0}>
+          <Text style={[styles.markReadText, unreadCount === 0 && { opacity: 0.4 }]}>อ่านทั้งหมด</Text>
         </TouchableOpacity>
       </View>
 
@@ -142,13 +190,47 @@ export default function AlertsScreen({ navigation }: any) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} />}
       >
         
-        {totalNotifications === 0 ? (
+        {!hasAnything ? (
           <View style={styles.emptyContainer}>
             <Feather name="bell-off" size={48} color={theme.textLight} style={{ marginBottom: 16 }} />
             <Text style={styles.emptyText}>ไม่มีการแจ้งเตือนในขณะนี้</Text>
           </View>
         ) : (
           <>
+            {/* --- แจ้งเตือนจากระบบ (แผนซื้อของ) — Employee จะได้ลิสต์ว่างจาก backend --- */}
+            {notifications.length > 0 && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: theme.textLight }]}>จากระบบ</Text>
+                {notifications.map(item => {
+                  const failed = item.type === 'PURCHASE_RECOMMENDATION_FAILED';
+                  return (
+                    <TouchableOpacity
+                      key={`noti-${item.id}`}
+                      style={[styles.card, !item.read && styles.cardUnread]}
+                      onPress={() => handleNotificationPress(item)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={styles.cardInfo}>
+                        <View style={[styles.notiIcon, { backgroundColor: failed ? theme.expiredBg : theme.successBg }]}>
+                          <Feather
+                            name={failed ? 'alert-triangle' : 'shopping-cart'}
+                            size={18}
+                            color={failed ? theme.expired : theme.success}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.itemName}>{item.title}</Text>
+                          <Text style={styles.itemDesc}>{item.message}</Text>
+                          <Text style={styles.notiTime}>{formatRelativeTime(item.createdAt)}</Text>
+                        </View>
+                      </View>
+                      {!item.read && <View style={[styles.dot, { backgroundColor: theme.nearExpiry, marginRight: 0, marginLeft: 12 }]} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
             {/* --- หมวดหมู่: หมดอายุ (EXPIRED) --- */}
             {expiredItems.length > 0 && (
               <View style={styles.section}>
@@ -261,7 +343,10 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: FONT_BOLD, fontSize: 11, letterSpacing: 1.5, marginBottom: 12, marginLeft: 4 },
   
   card: { backgroundColor: theme.card, borderRadius: 20, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
+  cardUnread: { borderWidth: 1, borderColor: theme.nearExpiryBg },
   cardInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  notiIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  notiTime: { fontFamily: FONT_REGULAR, fontSize: 12, color: theme.textLight, marginTop: 6 },
   dot: { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
   itemName: { fontFamily: FONT_BOLD, fontSize: 16, color: theme.textDark, marginBottom: 4 },
   itemDesc: { fontFamily: FONT_REGULAR, fontSize: 13, color: theme.textLight },

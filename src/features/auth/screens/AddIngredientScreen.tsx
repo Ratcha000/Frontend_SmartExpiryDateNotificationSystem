@@ -19,6 +19,7 @@ import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
 import IngredientPicker from './components/IngredientPicker';
 import PartDropdown from './components/PartDropdown';
 import { getIngredientType, INGREDIENT_TYPES, OTHER_KEY } from './components/ingredientCatalog';
+import type { OcrExtractResponse, ScanMeta } from '../../../types';
 
 const theme = {
   background: '#F9F8F4',
@@ -49,7 +50,7 @@ const CATEGORIES = Object.keys(CATEGORY_MAP);
 const STORAGE_LOCATIONS = ['Walk-in Fridge', 'Freezer A', 'Freezer B', 'Dry Pantry', 'Countertop'];
 const NOTIFY_DAYS = ['1', '2', '3', '5', '7'];
 
-export default function AddIngredientScreen({ navigation }: any) {
+export default function AddIngredientScreen({ navigation, route }: any) {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [addMode, setAddMode] = useState<'SINGLE' | 'BATCH'>('SINGLE');
@@ -83,6 +84,9 @@ export default function AddIngredientScreen({ navigation }: any) {
 
   // 🔴 State สำหรับเปิด/ปิด ปฏิทิน
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // ข้อมูล audit จากหน้าสแกน (ถ้าวันหมดอายุมาจาก OCR)
+  const [scanMeta, setScanMeta] = useState<ScanMeta | null>(null);
 
   const [notifyDaysBefore, setNotifyDaysBefore] = useState(NOTIFY_DAYS[1]);
   const [storageLocation, setStorageLocation] = useState(STORAGE_LOCATIONS[0]);
@@ -132,6 +136,19 @@ export default function AddIngredientScreen({ navigation }: any) {
     }
   }, [category]);
 
+  // รับวันหมดอายุที่สแกนมาจาก ScanExpiryScreen แล้วเติมลงฟอร์ม (ผู้ใช้ยังแก้ไขได้)
+  useEffect(() => {
+    const ocr = route?.params?.ocrResult as OcrExtractResponse | undefined;
+    if (!ocr?.expiryDate) return;
+
+    setExpiryDate(ocr.expiryDate);
+    // ต้องตั้ง flag นี้ ไม่งั้น effect ของ category ด้านบนจะทับด้วยวันแนะนำ
+    setIsManualExpiry(true);
+    setScanMeta({ scannedAt: ocr.scannedAt, scannedBy: ocr.scannedBy });
+    // เคลียร์ param ทิ้ง กันเติมซ้ำตอน re-render
+    navigation.setParams({ ocrResult: undefined });
+  }, [route?.params?.ocrResult]);
+
   /** เลือกวงกลมวัตถุดิบ */
   const handleSelectType = (type: typeof INGREDIENT_TYPES[number]) => {
     setTypeKey(type.key);
@@ -150,6 +167,7 @@ export default function AddIngredientScreen({ navigation }: any) {
     if (selectedDate) {
       setExpiryDate(selectedDate.toISOString().split('T')[0]);
       setIsManualExpiry(true); // รู้ว่าผู้ใช้ตั้งใจเลือกเองแล้ว
+      setScanMeta(null); // แก้วันเองแล้ว ไม่ใช่ค่าจากการสแกนอีกต่อไป
     }
   };
 
@@ -157,6 +175,7 @@ export default function AddIngredientScreen({ navigation }: any) {
   const applySuggestedDate = () => {
     setExpiryDate(suggestedDate);
     setIsManualExpiry(false);
+    setScanMeta(null);
   };
 
   const handleAddPart = () => {
@@ -220,7 +239,8 @@ export default function AddIngredientScreen({ navigation }: any) {
           categoryUnitHint: finalUnit,
           expiryDate,
           notifyDaysBefore: parseInt(notifyDaysBefore, 10),
-          storageLocation
+          storageLocation,
+          ...(scanMeta ?? {}),
         };
         await apiClient.post('/ingredients', payload);
       } else {
@@ -240,6 +260,7 @@ export default function AddIngredientScreen({ navigation }: any) {
           notifyDaysBefore: parseInt(notifyDaysBefore, 10),
           storageLocation,
           items,
+          ...(scanMeta ?? {}),
         };
         await apiClient.post('/ingredients/batch', payload);
       }
@@ -269,10 +290,10 @@ export default function AddIngredientScreen({ navigation }: any) {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.modeToggleContainer}>
           <TouchableOpacity style={[styles.modeButton, addMode === 'SINGLE' ? styles.modeButtonActive : undefined]} onPress={() => setAddMode('SINGLE')}>
-            <Text style={[styles.modeButtonText, addMode === 'SINGLE' ? styles.modeButtonTextActive : undefined]}>Single Item</Text>
+            <Text style={[styles.modeButtonText, addMode === 'SINGLE' ? styles.modeButtonTextActive : undefined]}>เพิ่มวัตถุดิบ</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.modeButton, addMode === 'BATCH' ? styles.modeButtonActive : undefined]} onPress={() => setAddMode('BATCH')}>
-            <Text style={[styles.modeButtonText, addMode === 'BATCH' ? styles.modeButtonTextActive : undefined]}>Batch (Split Parts)</Text>
+            <Text style={[styles.modeButtonText, addMode === 'BATCH' ? styles.modeButtonTextActive : undefined]}>เพิ่มวัตถุดิบ(หลายรายการ)</Text>
           </TouchableOpacity>
         </View>
 
@@ -405,7 +426,10 @@ export default function AddIngredientScreen({ navigation }: any) {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.cameraButton}>
+            <TouchableOpacity
+              style={styles.cameraButton}
+              onPress={() => navigation.navigate('ScanExpiry')}
+            >
               <Feather name="camera" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
@@ -418,10 +442,19 @@ export default function AddIngredientScreen({ navigation }: any) {
             </Text>
           </TouchableOpacity>
 
-          <View style={styles.ocrHint}>
-            <Feather name="camera" size={12} color={theme.textLight} style={{ marginRight: 6 }} />
-            <Text style={styles.ocrHintText}>กดรูปกล้องเพื่อสแกนวันหมดอายุด้วย OCR</Text>
-          </View>
+          {scanMeta ? (
+            <View style={styles.scannedHint}>
+              <Feather name="check-circle" size={12} color={theme.success} style={{ marginRight: 6 }} />
+              <Text style={styles.scannedHintText}>
+                วันที่นี้มาจากการสแกนฉลาก — ตรวจสอบให้ตรงกับของจริงก่อนบันทึก
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.ocrHint}>
+              <Feather name="camera" size={12} color={theme.textLight} style={{ marginRight: 6 }} />
+              <Text style={styles.ocrHintText}>กดรูปกล้องเพื่อสแกนวันหมดอายุด้วย OCR</Text>
+            </View>
+          )}
         </View>
 
         {/* ตัว Component ปฏิทินที่จะเด้งขึ้นมา */}
@@ -447,17 +480,6 @@ export default function AddIngredientScreen({ navigation }: any) {
               </TouchableOpacity>
             ))}
           </ScrollView>
-        </View>
-
-        {/* 🔴 Par Level (แยกบรรทัดมาเดี่ยวๆ) */}
-        <View style={[styles.inputGroup, { zIndex: 1 }]}>
-          <Text style={styles.label}>ปริมาณขั้นต่ำที่ต้องมี</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: '#F3F4F6', color: theme.textLight }]}
-            placeholder="ระบบคำนวณให้อัตโนมัติ (20% ของเริ่มต้น)"
-            placeholderTextColor={theme.textLight}
-            editable={false}
-          />
         </View>
 
         {/* 🔴 แจ้งเตือนล่วงหน้า (แยกบรรทัด ให้เลื่อนแนวนอนได้ยาวๆ เต็มจอ) */}
@@ -590,6 +612,8 @@ const styles = StyleSheet.create({
 
   ocrHint: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginLeft: 4 },
   ocrHintText: { fontFamily: FONT_REGULAR, fontSize: 12, color: theme.textLight },
+  scannedHint: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginLeft: 4, paddingRight: 12 },
+  scannedHintText: { flex: 1, fontFamily: FONT_REGULAR, fontSize: 12, color: theme.success },
 
   partsSection: { backgroundColor: '#F3F4F6', padding: 16, borderRadius: 20, marginBottom: 20 },
   partRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },

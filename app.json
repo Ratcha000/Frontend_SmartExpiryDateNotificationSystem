@@ -24,7 +24,19 @@
     "plugins": [
       "expo-font",
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "ใช้กล้องเพื่อสแกนวันหมดอายุบนฉลากสินค้า"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "เลือกรูปฉลากจากคลังภาพเพื่อสแกนวันหมดอายุ"
+        }
+      ]
     ]
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,18 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../../../context/AuthContext';
-import apiClient from '../../../api/client';
+import {
+  adjustIngredientQuantity,
+  consumeIngredient,
+  deleteIngredient,
+  getErrorMessage,
+  getUsageHistory,
+  markIngredientUsed,
+  restockIngredient,
+} from '../../../api/ingredients';
+import type { UsageActionType, UsageHistory } from '../../../types';
 import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
+import { formatRelativeTime } from './components/purchase/purchaseUtils';
 
 const theme = {
   background: '#F9F8F4',
@@ -32,6 +42,23 @@ const theme = {
   border: '#E8E6E1',
 };
 
+/** หน้าตาของแต่ละ action ในไทม์ไลน์ประวัติ */
+const USAGE_META: Record<UsageActionType, { label: string; icon: string; color: string }> = {
+  ADDED: { label: 'เพิ่มเข้าคลัง', icon: 'plus', color: theme.textLight },
+  EDITED: { label: 'แก้ไขข้อมูล', icon: 'edit-2', color: theme.textLight },
+  CONSUMED: { label: 'ใช้ไป', icon: 'arrow-down', color: theme.nearExpiry },
+  RESTOCKED: { label: 'เติมสต็อก', icon: 'refresh-cw', color: '#10B981' },
+  ADJUSTED: { label: 'ปรับยอดคงเหลือ', icon: 'edit-3', color: theme.lowStock },
+  USED: { label: 'ใช้หมดแล้ว', icon: 'check', color: theme.textLight },
+  DELETED: { label: 'ลบออกจากคลัง', icon: 'trash-2', color: theme.danger },
+};
+
+/** ตัดทศนิยมท้ายที่ backend ส่งมาแบบ 3.000 ให้อ่านง่าย */
+const formatQty = (value: number) =>
+  Number.isFinite(value) ? Number(Number(value).toFixed(2)).toString() : '-';
+
+type ActionType = 'consume' | 'restock' | 'adjust';
+
 export default function IngredientDetailScreen({ route, navigation }: any) {
   // 🔴 ใช้ State มารับค่า item เพื่อให้เวลาแก้ไข (Consume/Restock) หน้าจอจะอัปเดตตัวเลขได้ทันที
   const [currentItem, setCurrentItem] = useState(route.params.item);
@@ -49,13 +76,21 @@ export default function IngredientDetailScreen({ route, navigation }: any) {
     onConfirm: null as (() => void) | null,
   });
 
-  // State สำหรับ Modal Consume / Restock
+  // State สำหรับ Modal Consume / Restock / Adjust
   const [actionModal, setActionModal] = useState({
     visible: false,
-    type: 'consume' as 'consume' | 'restock',
+    type: 'consume' as ActionType,
     amount: '',
+    note: '',
   });
   const [isActionLoading, setIsActionLoading] = useState(false);
+
+  // ประวัติการใช้งานจริงจาก backend
+  const [history, setHistory] = useState<UsageHistory[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  const isActive = currentItem.status === 'ACTIVE';
 
   const showModal = (title: string, message: string, type: 'alert' | 'confirm' = 'alert', onConfirm: (() => void) | null = null) => {
     setModalConfig({ visible: true, title, message, type, onConfirm });
@@ -63,22 +98,16 @@ export default function IngredientDetailScreen({ route, navigation }: any) {
 
   const closeModal = () => setModalConfig(prev => ({ ...prev, visible: false }));
 
-  // ฟังก์ชันลบวัตถุดิบ (ดักจับ 500 Internal Server Error จาก Backend)
+  /** ลบวัตถุดิบ (soft delete — backend ไม่มีเส้น DELETE /ingredients/{id}) */
   const executeDelete = async () => {
     setIsLoading(true);
     try {
-      await apiClient.delete(`/ingredients/${currentItem.id}`);
+      await deleteIngredient(currentItem.id);
       closeModal();
-      navigation.goBack(); 
+      navigation.goBack();
     } catch (error: any) {
       console.log('Delete error:', error?.response?.status, error?.message);
-      
-      let errMsg = 'ไม่สามารถลบวัตถุดิบได้ เกิดข้อผิดพลาดจากระบบ';
-      if (error?.response?.status === 500) {
-        errMsg = 'ระบบหลังบ้าน (Backend) แจ้งข้อผิดพลาด 500 อาจเกิดจากข้อมูลถูกผูกมัดหรือเซิร์ฟเวอร์มีปัญหาครับ';
-      }
-      
-      showModal('ข้อผิดพลาด', errMsg, 'alert');
+      showModal('ข้อผิดพลาด', getErrorMessage(error, 'ไม่สามารถลบวัตถุดิบได้'), 'alert');
     } finally {
       setIsLoading(false);
     }
@@ -101,45 +130,95 @@ export default function IngredientDetailScreen({ route, navigation }: any) {
     }
   };
 
-  // ฟังก์ชันจัดการ Consume / Restock
-  const handleActionSubmit = async () => {
-    const val = parseFloat(actionModal.amount);
-    if (isNaN(val) || val <= 0) {
-      showModal('ข้อมูลไม่ถูกต้อง', 'กรุณากรอกจำนวนตัวเลขที่ถูกต้อง', 'alert');
+  /** โหลดประวัติจริงของวัตถุดิบตัวนี้ */
+  const fetchHistory = useCallback(async () => {
+    if (!user?.restaurantId) {
+      setHistoryLoading(false);
+      setHistoryError('ไม่พบข้อมูลร้านค้า');
       return;
     }
+    setHistoryError(null);
+    try {
+      const res = await getUsageHistory(user.restaurantId, currentItem.id);
+      // เรียงใหม่สุดขึ้นก่อน เผื่อ backend ไม่ได้เรียงมาให้
+      const sorted = [...(res.data || [])].sort(
+        (a, b) => new Date(b.performedAt).getTime() - new Date(a.performedAt).getTime()
+      );
+      setHistory(sorted);
+    } catch (error: any) {
+      console.log('Usage history error:', error?.response?.data || error?.message);
+      setHistoryError(getErrorMessage(error, 'โหลดประวัติการใช้งานไม่สำเร็จ'));
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [user?.restaurantId, currentItem.id]);
 
-    let newQuantity = currentItem.quantity;
-    if (actionModal.type === 'consume') {
-      newQuantity -= val;
-      if (newQuantity < 0) newQuantity = 0; // ป้องกันสต็อกติดลบ
-    } else {
-      newQuantity += val;
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+
+  /**
+   * Consume / Restock / Adjust
+   * ส่งจำนวนให้ backend คำนวณเอง เพื่อให้เกิด usage history (AI แผนซื้อของใช้ประวัตินี้)
+   * consume/restock ส่ง "ส่วนต่าง" ส่วน adjust ส่ง "ยอดคงเหลือใหม่"
+   */
+  const handleActionSubmit = async () => {
+    const val = parseFloat(actionModal.amount);
+    const isAdjust = actionModal.type === 'adjust';
+    if (isNaN(val) || (isAdjust ? val < 0 : val <= 0)) {
+      showModal(
+        'ข้อมูลไม่ถูกต้อง',
+        isAdjust ? 'กรุณากรอกยอดคงเหลือที่ถูกต้อง (ห้ามติดลบ)' : 'กรุณากรอกจำนวนตัวเลขที่มากกว่า 0',
+        'alert'
+      );
+      return;
     }
 
     setIsActionLoading(true);
     try {
-      const res = await apiClient.put(`/ingredients/${currentItem.id}`, {
-        ...currentItem,
-        quantity: newQuantity
-      });
-      setCurrentItem(res.data); // อัปเดตข้อมูลบนหน้าจอ
-      setActionModal({ visible: false, type: 'consume', amount: '' }); // ปิด Modal
+      const note = actionModal.note;
+      const res =
+        actionModal.type === 'consume'
+          ? await consumeIngredient(currentItem.id, val, note)
+          : actionModal.type === 'restock'
+          ? await restockIngredient(currentItem.id, val, note)
+          : await adjustIngredientQuantity(currentItem.id, val, note);
+
+      setCurrentItem(res.data);
+      setActionModal({ visible: false, type: 'consume', amount: '', note: '' });
+      fetchHistory();
     } catch (error: any) {
-      console.log('Action update error:', error?.message);
-      showModal('ข้อผิดพลาด', 'ไม่สามารถอัปเดตจำนวนสต็อกได้', 'alert');
+      console.log('Action update error:', error?.response?.data || error?.message);
+      showModal('ข้อผิดพลาด', getErrorMessage(error, 'ไม่สามารถอัปเดตจำนวนสต็อกได้'), 'alert');
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  // ประวัติการใช้งาน (จำลองไว้ก่อนรอ Backend)
-  const dummyHistory = [
-    { id: 1, type: 'consume', amount: '0.6 L', user: 'Marco R.', time: 'Today, 10:42 AM', icon: 'arrow-down', color: theme.nearExpiry },
-    { id: 2, type: 'restock', amount: '2 L', user: 'System', time: 'Today, 08:15 AM', icon: 'refresh-cw', color: '#10B981' },
-    { id: 3, type: 'consume', amount: '1 L', user: 'Sofia L.', time: 'Yesterday, 7:30 PM', icon: 'arrow-down', color: theme.nearExpiry },
-    { id: 4, type: 'add', amount: '4 L', user: 'Admin', time: 'Jul 20, 9:00 AM', icon: 'plus', color: theme.textLight },
-  ];
+  /** ทำเครื่องหมายว่าใช้หมดแล้ว -> status เป็น USED */
+  const executeMarkUsed = async () => {
+    setIsLoading(true);
+    try {
+      const res = await markIngredientUsed(currentItem.id);
+      setCurrentItem(res.data);
+      closeModal();
+      fetchHistory();
+    } catch (error: any) {
+      console.log('Mark used error:', error?.response?.data || error?.message);
+      showModal('ข้อผิดพลาด', getErrorMessage(error, 'ไม่สามารถอัปเดตสถานะได้'), 'alert');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMarkUsedPress = () => {
+    showModal(
+      'ยืนยันการใช้หมด',
+      `ทำเครื่องหมายว่า "${currentItem.name}" ถูกใช้หมดแล้วใช่หรือไม่?`,
+      'confirm',
+      executeMarkUsed
+    );
+  };
 
   const calculateProgress = () => {
     const par = currentItem.initialQuantity || 1;
@@ -204,23 +283,37 @@ export default function IngredientDetailScreen({ route, navigation }: any) {
           </View>
         </View>
 
-        {/* --- Storage Location --- */}
-        <View style={styles.storageCard}>
-          <Feather name="map-pin" size={18} color={theme.textLight} />
-          <Text style={styles.storageText}>{currentItem.storageLocation || 'Walk-in Fridge'}</Text>
-        </View>
+        {/* --- ข้อมูลล็อต / การใช้ล่าสุด (backend ไม่มี field ที่เก็บ storage location) --- */}
+        {(currentItem.lotName || currentItem.lastUsedAt) && (
+          <View style={styles.storageCard}>
+            {currentItem.lotName ? (
+              <>
+                <Feather name="package" size={18} color={theme.textLight} />
+                <Text style={styles.storageText}>ล็อต {currentItem.lotName}</Text>
+              </>
+            ) : null}
+            {currentItem.lastUsedAt ? (
+              <>
+                <Feather name="clock" size={18} color={theme.textLight} />
+                <Text style={styles.storageText}>ใช้ล่าสุด {formatRelativeTime(currentItem.lastUsedAt)}</Text>
+              </>
+            ) : null}
+          </View>
+        )}
 
         {/* --- Main Action Buttons (Consume / Restock) --- */}
         <View style={styles.mainActionsRow}>
           <TouchableOpacity 
-            style={[styles.mainActionBtn, { backgroundColor: theme.primary }]}
-            onPress={() => setActionModal({ visible: true, type: 'consume', amount: '' })}
+            style={[styles.mainActionBtn, { backgroundColor: theme.primary }, !isActive && styles.disabledBtn]}
+            onPress={() => setActionModal({ visible: true, type: 'consume', amount: '', note: '' })}
+            disabled={!isActive}
           >
             <Text style={[styles.mainActionText, { color: '#FFF' }]}>Consume</Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.mainActionBtn, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }]}
-            onPress={() => setActionModal({ visible: true, type: 'restock', amount: '' })}
+            style={[styles.mainActionBtn, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }, !isActive && styles.disabledBtn]}
+            onPress={() => setActionModal({ visible: true, type: 'restock', amount: '', note: '' })}
+            disabled={!isActive}
           >
             <Text style={[styles.mainActionText, { color: theme.textDark }]}>Restock</Text>
           </TouchableOpacity>
@@ -228,11 +321,26 @@ export default function IngredientDetailScreen({ route, navigation }: any) {
 
         {/* --- Secondary Action Buttons --- */}
         <View style={styles.secondaryActionsRow}>
-          <TouchableOpacity style={styles.secActionBtn}>
+          <TouchableOpacity
+            style={[styles.secActionBtn, !isActive && styles.disabledBtn]}
+            onPress={handleMarkUsedPress}
+            disabled={!isActive}
+          >
             <Feather name="check" size={16} color={theme.textDark} />
             <Text style={styles.secActionText}>Mark Used</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secActionBtn}>
+          <TouchableOpacity
+            style={[styles.secActionBtn, !isActive && styles.disabledBtn]}
+            onPress={() =>
+              setActionModal({
+                visible: true,
+                type: 'adjust',
+                amount: String(currentItem.quantity ?? ''),
+                note: '',
+              })
+            }
+            disabled={!isActive}
+          >
             <Feather name="edit-2" size={16} color={theme.textDark} />
             <Text style={styles.secActionText}>Edit</Text>
           </TouchableOpacity>
@@ -242,32 +350,58 @@ export default function IngredientDetailScreen({ route, navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        {/* --- Usage History --- */}
+        {/* --- Usage History (จาก GET /api/usage-history) --- */}
         <Text style={styles.historyTitle}>Usage History</Text>
-        <View style={styles.historyContainer}>
-          {dummyHistory.map((hist, index) => (
-            <View key={hist.id} style={styles.historyItem}>
-              <View style={styles.historyIconCol}>
-                <View style={[styles.historyIconBg, { backgroundColor: `${hist.color}20` }]}>
-                  <Feather name={hist.icon as any} size={14} color={hist.color} />
+        {historyLoading ? (
+          <View style={styles.historyPlaceholder}>
+            <ActivityIndicator color={theme.textLight} />
+          </View>
+        ) : historyError ? (
+          <View style={styles.historyPlaceholder}>
+            <Text style={styles.historyEmptyText}>{historyError}</Text>
+          </View>
+        ) : history.length === 0 ? (
+          <View style={styles.historyPlaceholder}>
+            <Text style={styles.historyEmptyText}>ยังไม่มีประวัติการใช้งาน</Text>
+          </View>
+        ) : (
+          <View style={styles.historyContainer}>
+            {history.map((hist, index) => {
+              const meta = USAGE_META[hist.actionType];
+              const byMe = hist.performedBy && hist.performedBy === user?.id;
+              // performedBy เป็น user id ไม่ใช่ชื่อ จึงบอกได้แค่ว่าเป็นตัวเราเองหรือไม่
+              const subLine = [hist.note, byMe ? 'โดยคุณ' : null].filter(Boolean).join(' • ');
+              return (
+                <View key={hist.id} style={styles.historyItem}>
+                  <View style={styles.historyIconCol}>
+                    <View style={[styles.historyIconBg, { backgroundColor: `${meta.color}20` }]}>
+                      <Feather name={meta.icon as any} size={14} color={meta.color} />
+                    </View>
+                    {index !== history.length - 1 && <View style={styles.historyLine} />}
+                  </View>
+                  <View style={styles.historyContent}>
+                    <View style={styles.historyHeader}>
+                      <Text style={styles.historyActionText}>
+                        {meta.label}{' '}
+                        {hist.quantityChanged ? (
+                          <Text style={{ fontFamily: FONT_BOLD }}>
+                            {formatQty(hist.quantityChanged)} {hist.unit || currentItem.unit}
+                          </Text>
+                        ) : null}
+                      </Text>
+                      <Text style={styles.historyTimeText}>{formatRelativeTime(hist.performedAt)}</Text>
+                    </View>
+                    <Text style={styles.historyUserText}>
+                      {subLine
+                        ? subLine
+                        : `คงเหลือ ${formatQty(hist.quantityAfter)} ${hist.unit || currentItem.unit}`}
+                    </Text>
+                  </View>
                 </View>
-                {index !== dummyHistory.length - 1 && <View style={styles.historyLine} />}
-              </View>
-              <View style={styles.historyContent}>
-                <View style={styles.historyHeader}>
-                  <Text style={styles.historyActionText}>
-                    {hist.type === 'consume' ? 'Consumed ' : hist.type === 'restock' ? 'Restocked ' : 'Added '}
-                    <Text style={{ fontFamily: FONT_BOLD }}>{hist.amount}</Text>
-                  </Text>
-                  <Text style={styles.historyTimeText}>{hist.time}</Text>
-                </View>
-                <Text style={styles.historyUserText}>
-                  {hist.type === 'consume' ? 'Dinner service' : hist.type === 'restock' ? 'Morning delivery' : 'Initial stock entry'} • {hist.user}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
+              );
+            })}
+          </View>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -315,22 +449,34 @@ export default function IngredientDetailScreen({ route, navigation }: any) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <View style={[styles.modalIconBg, { backgroundColor: actionModal.type === 'consume' ? '#FEF3C7' : '#D1FAE5' }]}>
+            <View style={[styles.modalIconBg, { backgroundColor: actionModal.type === 'consume' ? '#FEF3C7' : actionModal.type === 'restock' ? '#D1FAE5' : theme.lowStockBg }]}>
               <Feather 
-                name={actionModal.type === 'consume' ? "minus-circle" : "plus-circle"} 
+                name={actionModal.type === 'consume' ? 'minus-circle' : actionModal.type === 'restock' ? 'plus-circle' : 'edit-3'} 
                 size={32} 
-                color={actionModal.type === 'consume' ? theme.nearExpiry : '#10B981'} 
+                color={actionModal.type === 'consume' ? theme.nearExpiry : actionModal.type === 'restock' ? '#10B981' : theme.lowStock} 
               />
             </View>
             
             <Text style={styles.modalTitle}>
-              {actionModal.type === 'consume' ? 'ใช้งานวัตถุดิบ (Consume)' : 'เติมสต็อก (Restock)'}
+              {actionModal.type === 'consume'
+                ? 'ใช้งานวัตถุดิบ (Consume)'
+                : actionModal.type === 'restock'
+                ? 'เติมสต็อก (Restock)'
+                : 'แก้จำนวนให้ตรงกับของจริง'}
             </Text>
-            <Text style={styles.modalMessage}>ปัจจุบันมีอยู่: {currentItem.quantity} {currentItem.unit}</Text>
+            <Text style={styles.modalMessage}>
+              {actionModal.type === 'adjust'
+                ? `ระบบบันทึกไว้ ${currentItem.quantity} ${currentItem.unit} — กรอกยอดที่นับได้จริง`
+                : `ปัจจุบันมีอยู่: ${currentItem.quantity} ${currentItem.unit}`}
+            </Text>
             
             <View style={styles.editInputWrapper}>
               <Text style={styles.editLabel}>
-                จำนวนที่ต้องการ{actionModal.type === 'consume' ? 'ใช้' : 'เพิ่ม'} ({currentItem.unit})
+                {actionModal.type === 'consume'
+                  ? `จำนวนที่ต้องการใช้ (${currentItem.unit})`
+                  : actionModal.type === 'restock'
+                  ? `จำนวนที่ต้องการเพิ่ม (${currentItem.unit})`
+                  : `ยอดคงเหลือจริง (${currentItem.unit})`}
               </Text>
               <TextInput
                 style={styles.editInput}
@@ -340,12 +486,21 @@ export default function IngredientDetailScreen({ route, navigation }: any) {
                 placeholder="0"
                 autoFocus
               />
+
+              <Text style={[styles.editLabel, { marginTop: 16 }]}>หมายเหตุ (ไม่บังคับ)</Text>
+              <TextInput
+                style={styles.noteInput}
+                value={actionModal.note}
+                onChangeText={(text) => setActionModal(prev => ({ ...prev, note: text }))}
+                placeholder="เช่น ใช้ทำอาหารมื้อเย็น"
+                placeholderTextColor={theme.textLight}
+              />
             </View>
 
             <View style={styles.modalButtonGroup}>
               <TouchableOpacity 
                 style={styles.modalButtonCancel} 
-                onPress={() => setActionModal(prev => ({ ...prev, visible: false }))}
+                onPress={() => setActionModal({ visible: false, type: 'consume', amount: '', note: '' })}
               >
                 <Text style={styles.modalButtonCancelText}>ยกเลิก</Text>
               </TouchableOpacity>
@@ -404,6 +559,9 @@ const styles = StyleSheet.create({
 
   historyTitle: { fontFamily: FONT_BOLD, fontSize: 18, color: theme.textDark, marginBottom: 16 },
   historyContainer: { paddingHorizontal: 4 },
+  historyPlaceholder: { backgroundColor: theme.card, borderRadius: 16, paddingVertical: 28, alignItems: 'center', borderWidth: 1, borderColor: theme.border },
+  historyEmptyText: { fontFamily: FONT_REGULAR, fontSize: 14, color: theme.textLight, textAlign: 'center', paddingHorizontal: 20, lineHeight: 22 },
+  disabledBtn: { opacity: 0.4 },
   historyItem: { flexDirection: 'row', marginBottom: 0 },
   historyIconCol: { alignItems: 'center', width: 32, marginRight: 12 },
   historyIconBg: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
@@ -429,4 +587,5 @@ const styles = StyleSheet.create({
   editInputWrapper: { width: '100%', marginBottom: 24 },
   editLabel: { fontFamily: FONT_BOLD, fontSize: 12, color: theme.textLight, marginBottom: 8, textAlign: 'center' },
   editInput: { fontFamily: FONT_BOLD, backgroundColor: theme.inputBg, borderRadius: 16, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 16, height: 60, fontSize: 24, color: theme.textDark, textAlign: 'center' },
+  noteInput: { fontFamily: FONT_REGULAR, backgroundColor: theme.inputBg, borderRadius: 16, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 16, height: 48, fontSize: 14, color: theme.textDark, textAlign: 'center' },
 });

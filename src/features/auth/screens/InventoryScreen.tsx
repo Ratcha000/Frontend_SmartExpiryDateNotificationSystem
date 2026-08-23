@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../../context/AuthContext';
 import apiClient from '../../../api/client';
+import { adjustIngredientQuantity } from '../../../api/ingredients';
 import { FONT_REGULAR, FONT_BOLD } from '../../../theme/fonts';
 
 const theme = {
@@ -154,10 +155,8 @@ export default function InventoryScreen({ navigation }: any) {
 
     setIsUpdating(true);
     try {
-      await apiClient.put(`/ingredients/${editingItem.id}`, {
-        ...editingItem,
-        quantity: newQty
-      });
+      // ใช้ adjust-quantity เพื่อให้ backend บันทึก usage history ADJUSTED ให้ด้วย
+      await adjustIngredientQuantity(editingItem.id, newQty);
       
       setEditingItem(null);
       fetchInventory(); 
@@ -543,11 +542,13 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingHorizontal: 20,
     paddingTop: 8,
+    paddingBottom: 100,
     gap: 16,
   },
   card: {
     backgroundColor: theme.card,
     borderRadius: 20,
+    marginBottom: 10,
     flexDirection: 'row',
     overflow: 'hidden',
     shadowColor: '#000',

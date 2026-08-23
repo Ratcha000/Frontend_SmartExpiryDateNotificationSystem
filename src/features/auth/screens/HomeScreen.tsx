@@ -226,7 +226,10 @@ export default function HomeScreen({ navigation }: any) {
         <Text style={styles.sectionTitle}>เมนูลัด</Text>
         <View style={styles.quickActionsGrid}>
           
-          <TouchableOpacity style={[styles.quickBtn, styles.quickBtnPrimary]}>
+          <TouchableOpacity
+            style={[styles.quickBtn, styles.quickBtnPrimary]}
+            onPress={() => navigation.navigate('ScanExpiry')}
+          >
             <Feather name="maximize" size={24} color="#FFF" />
             <Text style={[styles.quickBtnText, { color: '#FFF' }]}>สแกน</Text>
           </TouchableOpacity>
@@ -248,7 +251,10 @@ export default function HomeScreen({ navigation }: any) {
           </TouchableOpacity>
           
           {isManager ? (
-            <TouchableOpacity style={styles.quickBtn}>
+            <TouchableOpacity
+              style={styles.quickBtn}
+              onPress={() => navigation.navigate('PurchasePlanning')}
+            >
               <Feather name="shopping-cart" size={24} color={theme.textDark} />
               <Text style={styles.quickBtnText}>แผนซื้อของ</Text>
             </TouchableOpacity>
@@ -341,6 +347,17 @@ export default function HomeScreen({ navigation }: any) {
                   ) : null}
                 </>
               )}
+
+              <TouchableOpacity
+                style={styles.popupViewAllBtn}
+                onPress={() => {
+                  setShowNotificationPopup(false);
+                  navigation.navigate('Notifications');
+                }}
+              >
+                <Text style={styles.popupViewAllText}>ดูการแจ้งเตือนทั้งหมด</Text>
+                <Feather name="chevron-right" size={16} color={theme.primary} />
+              </TouchableOpacity>
             </View>
           </TouchableWithoutFeedback>
         </TouchableOpacity>
@@ -351,6 +368,18 @@ export default function HomeScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  popupViewAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#EBE7E0',
+  },
+  popupViewAllText: { fontFamily: FONT_BOLD, fontSize: 14, color: theme.primary },
+
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
